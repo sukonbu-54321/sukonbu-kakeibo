@@ -1,0 +1,670 @@
+/* 全体 */
+body {
+  font-family: "Arial", sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #121212;
+  color: #e0e0e0;
+  line-height: 1.6;
+}
+
+/* ヘッダー */
+h1 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #ffffff;
+  font-size: 1.6rem;
+}
+
+/* セクション */
+section {
+  background: #1e1e1e;
+  padding: 20px;
+  margin: 15px auto;
+  border-radius: 12px;
+  max-width: 700px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* 入力・セレクト・ボタン */
+input, select, button {
+  margin: 5px;
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: none;
+  outline: none;
+}
+
+input, select {
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+input::placeholder {
+  color: #888;
+}
+
+/* ボタン */
+button {
+  cursor: pointer;
+  background: #3a86ff;
+  color: #fff;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #265abf;
+}
+
+/* 削除ボタン */
+.delete-btn, #deleteGenreBtn {
+  background: #ff4b5c;
+}
+
+.delete-btn:hover, #deleteGenreBtn:hover {
+  background: #c0323f;
+}
+
+/* 編集ボタン */
+#editGenreBtn {
+  background: #ff9f1c;
+}
+#editGenreBtn:hover {
+  background: #cc7a15;
+}
+
+/* 履歴リスト */
+.genre-list h3 {
+  margin-bottom: 5px;
+  color: #ffffff;
+}
+
+.genre-list ul {
+  list-style: none;
+  padding: 0;
+}
+
+.genre-list li {
+  display: flex;
+  justify-content: space-between;
+  margin: 5px 0;
+  padding: 10px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  flex-wrap: wrap;
+}
+
+/* 進捗バー */
+#progressBar, #differenceBar {
+  width: 100%;
+  height: 12px;
+  background: #2a3558;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+#progress, #differenceProgress {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #34d399, #059669);
+  transition: width 0.5s ease;
+}
+
+#progress {
+  background: #3a86ff;
+}
+#differenceProgress {
+  background: #ff9f1c;
+}
+
+/* 電卓＋履歴 */
+#calculatorInput {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-content: center;
+}
+
+.calculator input {
+  margin-bottom: 10px;
+  padding: 5px;
+  font-size: 18px;
+  text-align: right;
+}
+
+#calc-history {
+  order: 1;
+  flex: 1;
+  min-width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #444;
+  padding: 6px;
+  background: #2a2a2a;
+  font-size: 13px;
+}
+
+.push {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.zero {
+  grid-column: span 2;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 4px;
+  font-size: 14px;
+}
+
+#entryLists, #compareInputs, #simulationInputs, #input, #goalInput {
+  display: none; 
+}
+
+
+.toggle-btn {
+  background: #6c757d;
+  color: #fff;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+.toggle-btn:hover {
+  background: #5a6268;
+}
+
+#logout-section {
+  text-align: center;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}
+
+#logoutBtn {
+  background: #ff4b5c;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#logoutBtn:hover {
+  background: #c0323f;
+}
+
+#login-section {
+  max-width: 400px;   /* セクション全体の幅 */
+  margin: 20px auto;  /* 中央寄せ */
+  text-align: center;
+}
+
+#login-section input {
+  width: 100%;        /* 横いっぱいに広げる */
+  max-width: 500px;   /* 最大幅を制御 */
+  margin: 8px 0;
+  padding: 12px;
+  border-radius: 6px;
+  border: none;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  font-size: 14px;
+  display: block;     /* 1行ずつ縦並びに */
+}
+
+#login-section button {
+  width: 100%;
+  max-width: 100px;
+  padding: 12px;
+  margin-top: 12px;
+  border-radius: 6px;
+  background: #3a86ff;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  border: none;
+}
+
+#login-section button:hover {
+  background: #265abf;
+}
+
+#goalInput, #input {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  background: #111827; /* ダーク背景 */
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+/* === 各入力行（ラベル＋入力） === */
+#goalInput .input-group,
+#input .input-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  max-width: 400px;
+}
+
+/* === ラベル === */
+#goalInput label,
+#input label {
+  flex: 1;
+  color: #ddd;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* === 入力欄 === */
+#goalInput input,
+#input input,
+#input select {
+  flex: 2;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: #1f2937;
+  color: #fff;
+}
+
+/* === ボタン系 === */
+#goalInput button,
+#input button {
+  width: fit-content;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+/* =============================
+   比較・差額・積立・履歴・電卓の統一デザイン
+============================= */
+#compare-section,
+#difference-section,
+#investment-section,
+#history-section,
+#investment-section {
+  background: #1e1e1e;
+  padding: 20px;
+  margin: 15px auto;
+  border-radius: 12px;
+  max-width: 700px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* 入力フォームを縦並びに */
+#compareInputs,
+#differenceInputs,
+#simulationInputs,
+#historyInputs,
+#investmentInputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  background: #111827;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+/* ラベル＋入力のペア */
+#compareInputs .input-group,
+#differenceInputs .input-group,
+#simulationInputs .input-group,
+#historyInputs .input-group,
+#investment .input-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  max-width: 400px;
+}
+
+/* ラベル */
+#compareInputs label,
+#differenceInputs label,
+#simulationInputs label,
+#historyInputs label,
+#investment label {
+  flex: 1;
+  color: #ddd;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* 入力欄 */
+#compareInputs input, 
+#differenceInputs input, 
+#simulationInputs input, 
+#historyInputs input,
+#investment input,
+#investment select,
+#compareInputs select,
+#differenceInputs select,
+#simulationInputs select {
+  flex: 2;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: #1f2937;
+  color: #fff;
+}
+
+/* ボタン統一 */
+#compareInputs button,
+#differenceInputs button,
+#simulationInputs button,
+#historyInputs button,
+#investment button {
+  width: fit-content;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#compareInputs button:hover,
+#differenceInputs button:hover,
+#simulationInputs button:hover,
+#historyInputs button:hover,
+#investment button:hover {
+  background: #1e40af;
+}
+
+/* 履歴のリスト表示 */
+#historyList {
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+/* 計算ツールの背景統一 */
+.calculator {
+  background: #111827;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    order: 2;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+}
+.push button {
+  background: #2563eb;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.push button:hover {
+  background: #6b6b6b;
+}
+/* === 投資セクションの統一デザイン === */
+#investment-section {
+  background: #1e1e1e;
+  padding: 20px;
+  margin: 15px auto;
+  border-radius: 12px;
+  max-width: 700px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+#investment-section h2 {
+  color: #fff;
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+
+#investmentInput {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  background: #111827;      /* 内部フォーム背景統一 */
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+#investmentInput .input-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  max-width: 400px;
+}
+
+#investmentInput label {
+  flex: 1;
+  text-align: right;
+  color: #ddd;
+  font-weight: bold;
+  font-size: 14px;
+  padding-right: 8px;
+  white-space: nowrap; /* ラベル折り返し防止 */
+}
+
+#investmentInput input,
+#investmentInput select {
+  flex: 2;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: #1f2937;
+  color: #fff;
+  width: 100%;
+}
+
+#investmentInput button {
+  width: fit-content;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+  align-self: flex-end;
+  margin-top: 10px;
+}
+
+#investmentInput button:hover {
+  background: #1e40af;
+}
+
+#investmentResult {
+  background: #2a2a2a;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+  line-height: 1.6;
+}
+
+/* =============================
+   共通：セクション内部入力欄の統一
+============================= */
+.section-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  background: #111827;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+.section-inputs .input-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.section-inputs label {
+  flex: 1;
+  color: #ddd;
+  font-weight: bold;
+  font-size: 14px;
+  text-align: left;
+}
+
+.section-inputs input,
+.section-inputs select {
+  flex: 2;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: #1f2937;
+  color: #fff;
+}
+
+.section-inputs button {
+  width: fit-content;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.section-inputs button:hover {
+  background: #1e40af;
+}
+
+#investmentResult {
+  background: #2a2a2a;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+  line-height: 1.6;
+}
+
+/* --- 既存のCSSのどこか下の方に追記 --- */
+@media (max-width: 600px) {
+
+/* ラベル＋入力のペア */
+#compareInputs .input-group,
+#differenceInputs .input-group,
+#simulationInputs .input-group,
+#historyInputs .input-group,
+#investment .input-group,
+#investmentInput,
+#calculatorInput,
+.input-group  {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  margin-bottom: 1px;
+}
+
+}
+
+/* =============================
+   トースト通知
+============================= */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  pointer-events: all;
+  animation: toast-in 0.3s ease;
+  min-width: 220px;
+  max-width: 340px;
+}
+
+.toast.undo  { background: #1e2937; border-left: 4px solid #38bdf8; }
+.toast.error { background: #2d1a1a; border-left: 4px solid #ff4b5c; }
+.toast.info  { background: #1a2d1a; border-left: 4px solid #34d399; }
+
+.toast-undo-btn {
+  margin-left: auto;
+  background: #38bdf8;
+  color: #0f172a;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.toast-undo-btn:hover {
+  background: #7dd3fc;
+}
+
+.toast-close-btn {
+  background: transparent;
+  color: #aaa;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.toast-close-btn:hover {
+  color: #fff;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(40px); }
+}

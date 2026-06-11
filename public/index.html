@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>すこんぶ専用家計簿</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ✅ ログイン画面 -->
+  <div id="login-section">
+    <h2>ログイン</h2>
+    <input type="email" id="loginEmail" placeholder="メールアドレス"><br>
+    <input type="password" id="loginPassword" placeholder="パスワード"><br>
+    <button id="signupBtn">新規登録</button>
+    <button id="loginBtn">ログイン</button>
+    <p id="loginStatus"></p>
+  </div>
+
+  <!-- ✅ ログイン後だけ表示されるメイン画面 -->
+  <div id="mainApp" style="display:none;">
+    <h1>すこんぶ専用 家計簿&目標管理</h1>
+
+    <!-- 今ある家計簿の各セクション -->
+    <section id="goal-section">
+  <h2>目標設定</h2>
+  <button onclick="toggleSection('goalInput')">目標表示 / 非表示</button>
+  <div id="goalInput" style="display:none;">
+    
+    <div class="input-group">
+      <label for="goalName">目標名：</label>
+      <input type="text" id="goalName" placeholder="例: 海外旅行">
+    </div>
+
+    <div class="input-group">
+      <label for="goalAmount">目標金額 (円)：</label>
+      <input type="number" id="goalAmount" placeholder="例: 300000">
+    </div>
+
+    <div class="input-group">
+      <label for="goalPeriod">期間 (年)：</label>
+      <input type="number" id="goalPeriod" placeholder="例: 2">
+    </div>
+
+    <button onclick="setGoal()">設定</button>
+    <p id="goalDisplay">目標未設定</p>
+
+    <div id="progressBar"><div id="progress"></div></div>
+  </div>
+</section>
+
+
+<section id="input-section">
+  <h2>収支入力</h2>
+  <button onclick="toggleSection('input')">収支入力表示 / 非表示</button>
+  <div id="input" style="display:none;">
+
+    <div class="input-group">
+      <label for="genre">ジャンル：</label>
+      <select id="genre"></select>
+    </div>
+
+    <div class="input-group">
+      <label for="type">区分：</label>
+      <select id="type">
+        <option value="income">収入</option>
+        <option value="expense">支出</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label for="amount">金額 (円)：</label>
+      <input type="number" id="amount" placeholder="例: 5000">
+    </div>
+
+    <div class="input-group">
+      <label for="memo">メモ：</label>
+      <input type="text" id="memo" placeholder="任意">
+    </div>
+
+    <button onclick="addEntry()">追加</button>
+    <hr>
+
+    <div class="input-group">
+      <label for="newGenre">新しいジャンル：</label>
+      <input type="text" id="newGenre" placeholder="例: 趣味">
+    </div>
+
+    <button id="addGenreBtn" onclick="addGenre()">ジャンル追加</button>
+
+    <div id="genreControl">
+      <select id="genreSelect"></select>
+      <button id="editGenreBtn" onclick="editGenre()">編集</button>
+      <button id="deleteGenreBtn" onclick="deleteGenre()">削除</button>
+    </div>
+  </div>
+</section>
+
+
+  <section id="calculator-section">
+  <h2>計算ツール</h2>
+  <button onclick="toggleCalculator()">計算ツール表示 / 非表示</button>
+
+  <div class="calculator-column">
+  <div id="calculatorInput" style="display:none;">
+    <div class="calculator">
+      <input id="display" type="text" value="0" readonly>
+
+      <div class="push">
+        <button onclick="clearDisplay()">C</button>
+        <button onclick="backspace()">←</button>
+        <button onclick="press('/')">÷</button>
+        <button onclick="press('*')">×</button>
+
+        <button onclick="press('7')">7</button>
+        <button onclick="press('8')">8</button>
+        <button onclick="press('9')">9</button>
+        <button onclick="press('-')">-</button>
+
+        <button onclick="press('4')">4</button>
+        <button onclick="press('5')">5</button>
+        <button onclick="press('6')">6</button>
+        <button onclick="press('+')">+</button>
+
+        <button onclick="press('1')">1</button>
+        <button onclick="press('2')">2</button>
+        <button onclick="press('3')">3</button>
+        <button onclick="calculate()">=</button>
+
+        <button onclick="press('0')" class="zero">0</button>
+        <button onclick="press('.')">.</button>
+      </div>
+    </div>
+
+    <div id="calc-history">
+      <h3>履歴</h3>
+      <div id="history-list"></div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<section id="investment-section">
+  <h2>積立投資シミュレーション</h2>
+  <button onclick="toggleSection('investmentInput')">積み立て投資表示 / 非表示</button>
+  
+  <div id="investmentInput" class="section-inputs" style="display:none;">
+    
+    <div class="input-group">
+      <label for="investMode">計算モード</label>
+      <select id="investMode" onchange="switchInvestMode()">
+        <option value="normal">積立総額を求める</option>
+        <option value="target">目標金額を達成するための毎月投資額</option>
+        <option value="period">目標金額を達成するための積立期間</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label for="initialInvestment">初期投資額(円)</label>
+      <input type="number" id="initialInvestment" placeholder="例: 100000">
+    </div>
+
+    <div class="input-group">
+      <label for="monthlyInvestment">毎月の積立額(円)</label>
+      <input type="number" id="monthlyInvestment" placeholder="例: 10000">
+    </div>
+
+    <div class="input-group">
+      <label for="years">積立年数(年)</label>
+      <input type="number" id="years" placeholder="例: 10">
+    </div>
+
+    <div class="input-group hidden" id="targetFields">
+      <label for="targetAmount">目標金額(円)</label>
+      <input type="number" id="targetAmount" placeholder="例: 1000000">
+    </div>
+
+    <div class="input-group">
+      <label for="annualRate">想定年利(%)</label>
+      <input type="number" id="annualRate" placeholder="例: 5">
+    </div>
+
+    <div class="input-group">
+      <label for="riskRate">想定リスク(%)</label>
+      <input type="number" id="riskRate" placeholder="例: 2">
+    </div>
+
+    <button onclick="simulateInvestment()">計算</button>
+
+    <div id="investmentResult" class="result-box"></div>
+  </div>
+</section>
+
+
+    
+   <section id="compare-section">
+  <h2>比較・差額シミュレーション</h2>
+  <button onclick="toggleSection('compareInputs')">比較・差額表示 / 非表示</button>
+  <div id="compareInputs" style="display:none;">
+    <div class="input-group">
+      <label>モード選択:</label>
+      <select id="compareGenre" onchange="toggleInterestFields()">
+        <option value="生活費">生活費</option>
+        <option value="副業">副業</option>
+        <option value="ポイ活">ポイ活</option>
+        <option value="投資">投資</option>
+      </select>
+      <label for="investmentMode">運用頻度：</label>
+      <select id="investmentMode" onchange="toggleInvestmentMode()">
+        <option value="once">1回のみ</option>
+        <option value="monthly">毎月積立</option>
+        <option value="yearly">年1回積立</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label>Aプラン金額 (円):</label>
+      <input type="number" id="aAmount" placeholder="例: 50000">
+    </div>
+
+    <div class="input-group">
+      <label>Bプラン金額 (円):</label>
+      <input type="number" id="bAmount" placeholder="例: 40000">
+    </div>
+
+    <div class="input-group">
+      <label id="compareYearsLabel">期間 (年):</label>
+      <input type="number" id="compareYears" placeholder="例: 5">
+    </div>
+
+    <div id="interestFields" style="display:none;">
+      <div class="input-group">
+        <label>Aプラン利率 (%):</label>
+        <input type="number" id="aRate" placeholder="例: 5">
+      </div>
+      <div class="input-group">
+        <label>Bプラン利率 (%):</label>
+        <input type="number" id="bRate" placeholder="例: 2">
+      </div>
+    </div>
+
+    <button onclick="calculateCompare()">計算</button>
+    <div id="differenceResult"></div>
+  </div>
+</section>
+
+    <section id="list-section">
+      <h2>履歴</h2>
+      <button onclick="toggleSection('entryLists')">履歴表示 / 非表示</button>
+      <div id="entryLists" style="display:none;"></div>
+    </section>
+
+    <section id="summary-section">
+      <h2>集計</h2>
+      <p>合計収入: <span id="totalIncome">0</span> 円</p>
+      <p>合計支出: <span id="totalExpense">0</span> 円</p>
+      <p>残高: <span id="balance">0</span> 円</p>
+      <p>目標達成率: <span id="goalRate">0</span>%</p>
+    </section>
+
+    <div id="logout-section">
+  <button id="logoutBtn">ログアウト</button>
+    </div>
+
+  <!-- トースト通知 -->
+  <div id="toast-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
+
