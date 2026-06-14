@@ -8,11 +8,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 // スキーマバージョン（ロールフォワード管理）
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /**
  * 旧データを現在のスキーマに移行する
- * @param {object} data - Firebaseまたはlocalから読み込んだデータ
+ * バージョンが上がるたびに if 節を追加する（ロールフォワード対応）
+ * @param {object} data - Firebaseまたはローカルから読み込んだデータ
  * @returns {object} - マイグレーション後のデータ
  */
 function migrateData(data) {
@@ -29,17 +30,58 @@ function migrateData(data) {
     console.log("📦 データをスキーマ v2 にマイグレーション完了");
   }
 
+  if (ver < 3) {
+    // v2 → v3: tags フィールドを補完（将来のタグ機能拡張用スロット）
+    data.entries = (data.entries || []).map(e => ({
+      tags: [],
+      ...e
+    }));
+    data.schemaVersion = 3;
+    console.log("📦 データをスキーマ v3 にマイグレーション完了");
+  }
+
   return data;
 }
 
-// Firebase 初期化（APIキーを /__/firebase/init.json から取得）
+// Firebase 初期化（本番: /__/firebase/init.json → フォールバック: ./firebase-config.json）
 let auth, db;
 
 async function initFirebase() {
   try {
-    const res = await fetch("/__/firebase/init.json");
-    if (!res.ok) throw new Error(`init.json の取得失敗: ${res.status}`);
-    const firebaseConfig = await res.json();
+    let firebaseConfig = null;
+
+    // ローカルの静的サーバー（VS Code Live Server等でポート5000以外）かつ Firebase Hosting ではない環境の場合、
+    // 無駄な 404 ネットワークエラーログがコンソールに出るのを防ぐため init.json のフェッチをスキップ
+    const isLocalStaticServer = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && window.location.port !== "5000";
+
+    // 1次: Firebase Hosting 自動提供のURL
+    if (!isLocalStaticServer) {
+      try {
+        const res = await fetch("/__/firebase/init.json");
+        if (res.ok) firebaseConfig = await res.json();
+      } catch (_) {}
+    }
+
+    // 2次フォールバック: ローカル設定ファイル
+    if (!firebaseConfig) {
+      try {
+        const res2 = await fetch("./firebase-config.json");
+        if (res2.ok) {
+          const rawConfig = await res2.json();
+          // 空オブジェクト {} の場合は有効な設定なしとみなす
+          if (rawConfig && Object.keys(rawConfig).length > 0) {
+            firebaseConfig = rawConfig;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!firebaseConfig) {
+      // 設定ファイルがない場合は想定内のローカル動作モードとして移行
+      console.log("ℹ️ Firebase設定ファイルが無効または見つからないため、ローカルモードで起動します。");
+      setupUIWithoutAuth();
+      return;
+    }
 
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
@@ -53,8 +95,7 @@ async function initFirebase() {
     setupAuthListeners();
   } catch (e) {
     console.error("Firebase 初期化エラー:", e);
-    showToast("⚠️ Firebase への接続に失敗しました。ローカルデータで動作します。", "error");
-    // Firebaseなしでも画面は動作させる（localStorageのみ）
+    showToast("⚠️ Firebase の初期化中にエラーが発生しました。ローカルデータで動作します。", "error");
     setupUIWithoutAuth();
   }
 }
@@ -123,7 +164,7 @@ function setupUIWithoutAuth() {
 
 // Firebase 読み書き
 async function saveDataToFirebase() {
-  if (!auth || !auth.currentUser) return;
+  if (!auth || !auth.currentUser || !db) return;
   try {
     await setDoc(doc(db, "users", auth.currentUser.uid), {
       entries,
@@ -139,7 +180,7 @@ async function saveDataToFirebase() {
 }
 
 async function loadDataFromFirebase() {
-  if (!auth || !auth.currentUser) return;
+  if (!auth || !auth.currentUser || !db) return;
   try {
     const snap = await getDoc(doc(db, "users", auth.currentUser.uid));
     if (snap.exists()) {
@@ -148,10 +189,8 @@ async function loadDataFromFirebase() {
       entries = data.entries || [];
       goal = data.goal || null;
       genres = data.genres || ["投資", "副業", "ポイ活", "生活費", "シミュレーション"];
-      renderLists();
-      renderGoal();
-      updateSummary();
       updateGenreSelects();
+      refreshUI(); // 全表示の一括更新
       console.log("📦 Firebase からデータ復元完了");
     }
   } catch (e) {
@@ -160,43 +199,54 @@ async function loadDataFromFirebase() {
   }
 }
 
-// データ初期化（localStorage キャッシュ）
-let entries = JSON.parse(localStorage.getItem("entries")) || [];
-let goal = JSON.parse(localStorage.getItem("goal")) || null;
-let genres = JSON.parse(localStorage.getItem("genres")) || ["投資", "副業", "ポイ活", "生活費", "シミュレーション"];
+// ローカルキャッシュの読み込みとロールフォワード（マイグレーション）
+let localData = {
+  entries: JSON.parse(localStorage.getItem("entries")) || [],
+  goal: JSON.parse(localStorage.getItem("goal")) || null,
+  genres: JSON.parse(localStorage.getItem("genres")) || ["投資", "副業", "ポイ活", "生活費", "シミュレーション"],
+  schemaVersion: JSON.parse(localStorage.getItem("schemaVersion")) || 1
+};
+localData = migrateData(localData);
+
+let entries = localData.entries;
+let goal = localData.goal;
+let genres = localData.genres;
 
 // 投資カテゴリ（資産割合グラフ用の固定ラベル）
 const investmentCategories = ["投資信託", "米国株", "日本株", "米国ETF", "日本ETF"];
 
-// Undo 機能
-let previousState = null;
+// Undo 機能（最大10段階まで戻せる）
+const MAX_UNDO = 10;
+let undoStack = [];
 
 /**
  * 現在の状態をスナップショット保存（Undo 用）
  */
 function takeSnapshot() {
-  previousState = {
+  undoStack.push({
     entries: JSON.parse(JSON.stringify(entries)),
     goal: goal ? { ...goal } : null,
     genres: [...genres]
-  };
+  });
+  if (undoStack.length > MAX_UNDO) undoStack.shift(); // 上限超過分を削除
 }
 
 /**
- * スナップショットに戻す
+ * 1つ前のスナップショットに戻す
  */
 function undo() {
-  if (!previousState) return;
-  entries = previousState.entries;
-  goal = previousState.goal;
-  genres = previousState.genres;
-  previousState = null;
+  if (undoStack.length === 0) {
+    showToast("⚠️ これ以上戻せません", "error");
+    return;
+  }
+  const prev = undoStack.pop();
+  entries = prev.entries;
+  goal = prev.goal;
+  genres = prev.genres;
   saveData();
-  renderLists();
-  renderGoal();
-  updateSummary();
   updateGenreSelects();
-  showToast("✅ 元に戻しました", "info");
+  refreshUI();
+  showToast(`✅ 元に戻しました（残り ${undoStack.length} 歩）`, "info");
 }
 window.undo = undo;
 
@@ -207,6 +257,7 @@ async function saveData() {
     localStorage.setItem("entries", JSON.stringify(entries));
     localStorage.setItem("goal", JSON.stringify(goal));
     localStorage.setItem("genres", JSON.stringify(genres));
+    localStorage.setItem("schemaVersion", JSON.stringify(SCHEMA_VERSION)); // スキーマバージョンも保存
   } catch (e) {
     console.error("localStorage 保存エラー（容量超過の可能性）:", e);
     showToast("⚠️ ローカルストレージの容量が不足しています。", "error");
@@ -269,11 +320,19 @@ function removeToast(toast) {
 // ジャンル管理
 function addGenre() {
   const newG = document.getElementById("newGenre").value.trim();
-  if (newG && !genres.includes(newG)) {
-    genres.push(newG);
-    updateGenreSelects();
-    saveData();
+  if (!newG) {
+    showToast("⚠️ ジャンル名を入力してください", "error");
+    return;
   }
+  if (genres.includes(newG)) {
+    showToast("⚠️ そのジャンルは既に存在します", "error");
+    return;
+  }
+  takeSnapshot(); // Undo 用スナップショット
+  genres.push(newG);
+  updateGenreSelects();
+  saveData();
+  showToast(`✅ ジャンル「${newG}」を追加しました`, "undo");
   document.getElementById("newGenre").value = "";
 }
 window.addGenre = addGenre;
@@ -281,16 +340,29 @@ window.addGenre = addGenre;
 function editGenre() {
   const select = document.getElementById("genreSelect");
   const oldName = select.value;
-  if (!oldName) return;
+  if (!oldName) {
+    showToast("⚠️ 編集するジャンルを選択してください", "error");
+    return;
+  }
 
   const newName = prompt("新しいジャンル名を入力してください:", oldName);
-  if (newName && !genres.includes(newName)) {
-    genres = genres.map(g => g === oldName ? newName : g);
-    entries = entries.map(e => e.genre === oldName ? { ...e, genre: newName } : e);
+  if (newName) {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      showToast("⚠️ 有効なジャンル名を入力してください", "error");
+      return;
+    }
+    if (genres.includes(trimmed)) {
+      showToast("⚠️ そのジャンルは既に存在します", "error");
+      return;
+    }
+    takeSnapshot(); // Undo 用スナップショット
+    genres = genres.map(g => g === oldName ? trimmed : g);
+    entries = entries.map(e => e.genre === oldName ? { ...e, genre: trimmed } : e);
     saveData();
     updateGenreSelects();
-    renderLists();
-    alert(`「${oldName}」を「${newName}」に変更しました`);
+    refreshUI();
+    showToast(`✅ 「${oldName}」を「${trimmed}」に変更しました`, "undo");
   }
 }
 window.editGenre = editGenre;
@@ -298,7 +370,10 @@ window.editGenre = editGenre;
 function deleteGenre() {
   const select = document.getElementById("genreSelect");
   const target = select.value;
-  if (!target) return;
+  if (!target) {
+    showToast("⚠️ 削除するジャンルを選択してください", "error");
+    return;
+  }
 
   if (confirm(`ジャンル「${target}」を削除しますか？\n※このジャンルの収支データもすべて削除されます。`)) {
     takeSnapshot(); // ← Undo 用スナップショット
@@ -306,7 +381,7 @@ function deleteGenre() {
     entries = entries.filter(e => e.genre !== target);
     saveData();
     updateGenreSelects();
-    renderLists();
+    refreshUI();
     showToast(`🗑️ ジャンル「${target}」を削除しました`, "undo");
   }
 }
@@ -344,11 +419,15 @@ function setGoal() {
   const name = document.getElementById("goalName").value;
   const amount = parseInt(document.getElementById("goalAmount").value);
   const period = parseInt(document.getElementById("goalPeriod").value);
-  if (!name || !amount || !period) { alert("目標名・金額・期間を入力してください"); return; }
+  if (!name || !amount || !period) {
+    showToast("⚠️ 目標名・金額・期間を入力してください", "error");
+    return;
+  }
+  takeSnapshot(); // Undo 用スナップショット
   goal = { name, amount, period };
   saveData();
-  renderGoal();
-  updateSummary();
+  refreshUI();
+  showToast("🎯 目標を設定しました", "undo");
 }
 window.setGoal = setGoal;
 
@@ -360,6 +439,16 @@ function addEntry() {
   const memo = document.getElementById("memo").value || "-";
   const date = new Date().toISOString();
 
+  // ジャンル・金額入力値ガード
+  if (!genre) {
+    showToast("⚠️ ジャンルを選択してください", "error");
+    return;
+  }
+  if (!amount || isNaN(amount) || amount <= 0) {
+    showToast("⚠️ 正しい金額を入力してください", "error");
+    return;
+  }
+
   let investmentCategory = null;
   let investmentPlan = null;
   if (genre === "投資") {
@@ -367,7 +456,7 @@ function addEntry() {
     investmentPlan = document.getElementById("investmentPlan")?.value || null;
   }
 
-  if (!amount) { alert("金額を入力してください"); return; }
+  takeSnapshot(); // Undo 用スナップショット
 
   const existing = entries.find(e =>
     e.genre === genre &&
@@ -376,12 +465,15 @@ function addEntry() {
     (e.investmentCategory || null) === investmentCategory &&
     (e.investmentPlan || null) === investmentPlan
   );
-  if (existing) existing.amount += amount;
-  else entries.push({ genre, type, amount, memo, date, investmentCategory, investmentPlan });
+  if (existing) {
+    existing.amount += amount;
+  } else {
+    entries.push({ genre, type, amount, memo, date, investmentCategory, investmentPlan, tags: [] });
+  }
 
   saveData();
-  renderLists();
-  updateSummary();
+  refreshUI();
+  showToast("✅ 収支を追加しました", "undo");
 
   document.getElementById("amount").value = "";
   document.getElementById("memo").value = "";
@@ -393,8 +485,7 @@ function deleteEntry(index) {
   takeSnapshot(); // ← Undo 用スナップショット
   entries.splice(index, 1);
   saveData();
-  renderLists();
-  updateSummary();
+  refreshUI();
   showToast("🗑️ 収支を削除しました", "undo");
 }
 window.deleteEntry = deleteEntry;
@@ -402,12 +493,18 @@ window.deleteEntry = deleteEntry;
 // 履歴レンダリング
 function renderLists() {
   const container = document.getElementById("entryLists");
+  if (!container) return; // nullガード
   container.innerHTML = "";
   const grouped = {};
   entries.forEach((entry, index) => {
     if (!grouped[entry.genre]) grouped[entry.genre] = [];
     grouped[entry.genre].push({ ...entry, index });
   });
+
+  if (Object.keys(grouped).length === 0) {
+    container.innerHTML = "<p>履歴はありません。</p>";
+    return;
+  }
 
   for (let genre in grouped) {
     const div = document.createElement("div");
@@ -418,7 +515,7 @@ function renderLists() {
     grouped[genre].forEach(e => {
       const dateStr = new Date(e.date).toLocaleDateString("ja-JP");
       const li = document.createElement("li");
-      li.innerHTML = `<span>${dateStr} | ${e.type === "income" ? "収入" : "支出"}: ${e.amount}円 (${e.memo})</span>
+      li.innerHTML = `<span>${dateStr} | ${e.type === "income" ? "収入" : "支出"}: ${e.amount.toLocaleString()}円 (${e.memo})</span>
                       <button class="delete-btn" onclick="deleteEntry(${e.index})">削除</button>`;
       ul.appendChild(li);
     });
@@ -428,25 +525,42 @@ function renderLists() {
   }
 }
 
-// 集計
+// 集計（当月・年年両方対応）
 function updateSummary() {
-  const nowMonth = new Date().getMonth() + 1;
-  const monthlyEntries = entries.filter(e => (new Date(e.date).getMonth() + 1) === nowMonth);
+  const now = new Date();
+  const nowYear  = now.getFullYear();
+  const nowMonth = now.getMonth();
+  // 年と月の両方でフィルターする（年をまたいで同月のデータが混入するバグを修正）
+  const monthlyEntries = entries.filter(e => {
+    const d = new Date(e.date);
+    return d.getFullYear() === nowYear && d.getMonth() === nowMonth;
+  });
 
-  const totalIncome = monthlyEntries.filter(e => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
+  const totalIncome  = monthlyEntries.filter(e => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
   const totalExpense = monthlyEntries.filter(e => e.type === "expense").reduce((sum, e) => sum + e.amount, 0);
   const balance = totalIncome - totalExpense;
 
-  document.getElementById("totalIncome").textContent = totalIncome;
-  document.getElementById("totalExpense").textContent = totalExpense;
-  document.getElementById("balance").textContent = balance;
+  document.getElementById("totalIncome").textContent  = totalIncome.toLocaleString();
+  document.getElementById("totalExpense").textContent = totalExpense.toLocaleString();
+  document.getElementById("balance").textContent      = balance.toLocaleString();
 
   if (goal) {
     const progressPercent = Math.min((balance / goal.amount) * 100, 100);
-    document.getElementById("progress").style.width = progressPercent + "%";
-    document.getElementById("goalRate").textContent = Math.floor(progressPercent);
+    document.getElementById("progress").style.width    = progressPercent + "%";
+    document.getElementById("goalRate").textContent    = Math.max(0, Math.floor(progressPercent));
   }
 }
+
+/**
+ * UIの各表示コンポーネント（履歴一覧、目標設定、集計カード、ダッシュボード/各種グラフ）を一元化して同期更新する
+ */
+function refreshUI() {
+  renderLists();
+  renderGoal();
+  updateSummary();
+  refreshAllData();
+}
+window.refreshUI = refreshUI;
 
 // 目標表示
 function renderGoal() {
@@ -645,7 +759,7 @@ function calculate() {
     calcValue = result.toString();
     updateDisplay();
   } catch {
-    alert("計算エラー：不正な式です");
+    showToast("⚠️ 計算エラー：不正な式です", "error");
     calcValue = "0";
     updateDisplay();
   }
@@ -809,6 +923,10 @@ window.simulateInvestment = simulateInvestment;
 function renderInvestChart(labels, values) {
   const ctx = document.getElementById("investChart");
   if (!ctx) return;
+  if (typeof Chart === "undefined") {
+    console.warn("Chart.js が読み込まれていません。");
+    return;
+  }
   if (window.investChart) window.investChart.destroy();
   window.investChart = new Chart(ctx.getContext("2d"), {
     type: "bar",
@@ -844,6 +962,10 @@ window.showTool = showTool;
 function renderBudgetChart(spent, remaining) {
   const ctx = document.getElementById("budgetGaugeChart");
   if (!ctx) return;
+  if (typeof Chart === "undefined") {
+    console.warn("Chart.js が読み込まれていません。");
+    return;
+  }
   if (window.myBudgetChart) window.myBudgetChart.destroy();
   window.myBudgetChart = new Chart(ctx, {
     type: "doughnut",
@@ -938,6 +1060,19 @@ function updateAssetVisuals() {
   const labels = Object.keys(assetData);
   const values = labels.map(k => Math.max(0, assetData[k]));
 
+  // リスト詳細表示は Chart がロードされていなくても常に実行（可用性の向上）
+  const listEl = document.getElementById("asset-detail-list");
+  if (listEl) {
+    listEl.innerHTML = labels.map((l, i) =>
+      `<div class="history-item"><span>${l}</span><span>¥${values[i].toLocaleString()}</span></div>`
+    ).join("");
+  }
+
+  if (typeof Chart === "undefined") {
+    console.warn("Chart.js が読み込まれていません。");
+    return;
+  }
+
   if (window.myAssetChart) window.myAssetChart.destroy();
   window.myAssetChart = new Chart(ctx, {
     type: "bar",
@@ -954,13 +1089,6 @@ function updateAssetVisuals() {
       scales: { y: { beginAtZero: true } }
     }
   });
-
-  const listEl = document.getElementById("asset-detail-list");
-  if (listEl) {
-    listEl.innerHTML = labels.map((l, i) =>
-      `<div class="history-item"><span>${l}</span><span>¥${values[i].toLocaleString()}</span></div>`
-    ).join("");
-  }
 }
 
 let budgetChart = null;
@@ -1004,22 +1132,6 @@ function updateTotalAssets() {
 }
 
 // ============================================================
-// 投資ジャンル選択時の追加入力欄
-// ============================================================
-const genreSelectForInvestment = document.getElementById("genre");
-if (genreSelectForInvestment) {
-  const toggleInvestmentInputs = () => {
-    const isInvestment = genreSelectForInvestment.value === "投資";
-    const optEl  = document.getElementById("investment-options");
-    const planEl = document.getElementById("investment-plan-options");
-    if (optEl)  optEl.style.display  = isInvestment ? "flex" : "none";
-    if (planEl) planEl.style.display = isInvestment ? "flex" : "none";
-  };
-  genreSelectForInvestment.addEventListener("change", toggleInvestmentInputs);
-  toggleInvestmentInputs();
-}
-
-// ============================================================
 // ページロード時の初期化
 // ============================================================
 document.addEventListener("DOMContentLoaded", () => {
@@ -1027,13 +1139,21 @@ document.addEventListener("DOMContentLoaded", () => {
   renderHistory();
   updateDisplay();
   updateGenreSelects();
-  renderLists();
-  renderGoal();
-  updateSummary();
-  updateFireCountdown();
-  updateBudgetVisuals();
-  updateAssetVisuals();
-  updateTotalAssets();
+  refreshUI(); // 画面全体の描画・同期更新
+
+  // 投資ジャンル選択時の追加入力欄をここで初期化（DOMロード完了後に実行）
+  const genreSelectForInvestment = document.getElementById("genre");
+  if (genreSelectForInvestment) {
+    const toggleInvestmentInputs = () => {
+      const isInvestment = genreSelectForInvestment.value === "投資";
+      const optEl  = document.getElementById("investment-options");
+      const planEl = document.getElementById("investment-plan-options");
+      if (optEl)  optEl.style.display  = isInvestment ? "flex" : "none";
+      if (planEl) planEl.style.display = isInvestment ? "flex" : "none";
+    };
+    genreSelectForInvestment.addEventListener("change", toggleInvestmentInputs);
+    toggleInvestmentInputs();
+  }
 });
 
 // Firebase 初期化を起動（非同期）

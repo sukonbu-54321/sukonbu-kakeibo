@@ -1,606 +1,614 @@
-/* 全体 */
-body {
-  font-family: "Arial", sans-serif;
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* ==========================================================================
+   CSS Variables & Theme Settings
+   ========================================================================== */
+:root {
+  --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  
+  /* Color Palette */
+  --bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #09090b 100%);
+  --bg-card: rgba(20, 20, 25, 0.65);
+  --bg-input: rgba(10, 10, 12, 0.6);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(99, 102, 241, 0.5);
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  /* Status Colors */
+  --primary: #6366f1;       /* Indigo */
+  --primary-hover: #4f46e5;
+  --success: #10b981;       /* Emerald */
+  --success-hover: #059669;
+  --warning: #f59e0b;       /* Amber */
+  --warning-hover: #d97706;
+  --danger: #ef4444;        /* Rose/Red */
+  --danger-hover: #dc2626;
+  --info: #06b6d4;          /* Cyan */
+  
+  /* Layout & Styling */
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --backdrop-blur: blur(12px);
+}
+
+/* ==========================================================================
+   Global Reset & Base Style
+   ========================================================================== */
+* {
+  box-sizing: border-box;
   margin: 0;
-  padding: 20px;
-  background: #121212;
-  color: #e0e0e0;
-  line-height: 1.6;
-}
-
-/* ヘッダー */
-h1 {
-  text-align: center;
-  margin-bottom: 20px;
-  color: #ffffff;
-  font-size: 1.6rem;
-}
-
-/* セクション */
-section {
-  background: #1e1e1e;
-  padding: 20px;
-  margin: 15px auto;
-  border-radius: 12px;
-  max-width: 700px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-/* 入力・セレクト・ボタン */
-input, select, button {
-  margin: 5px;
-  padding: 10px;
-  font-size: 14px;
-  border-radius: 6px;
-  border: none;
-  outline: none;
-}
-
-input, select {
-  background: #2a2a2a;
-  color: #e0e0e0;
-}
-
-input::placeholder {
-  color: #888;
-}
-
-/* ボタン */
-button {
-  cursor: pointer;
-  background: #3a86ff;
-  color: #fff;
-  transition: background 0.2s;
-}
-
-button:hover {
-  background: #265abf;
-}
-
-/* 削除ボタン */
-.delete-btn, #deleteGenreBtn {
-  background: #ff4b5c;
-}
-
-.delete-btn:hover, #deleteGenreBtn:hover {
-  background: #c0323f;
-}
-
-/* 編集ボタン */
-#editGenreBtn {
-  background: #ff9f1c;
-}
-#editGenreBtn:hover {
-  background: #cc7a15;
-}
-
-/* 履歴リスト */
-.genre-list h3 {
-  margin-bottom: 5px;
-  color: #ffffff;
-}
-
-.genre-list ul {
-  list-style: none;
   padding: 0;
 }
 
-.genre-list li {
-  display: flex;
-  justify-content: space-between;
-  margin: 5px 0;
-  padding: 10px;
-  background: #2a2a2a;
-  border-radius: 6px;
-  flex-wrap: wrap;
+body {
+  font-family: var(--font-family);
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  line-height: 1.6;
+  padding: 24px 16px;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* 進捗バー */
+/* Scrollbar Style */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ==========================================================================
+   Typography & Headers
+   ========================================================================== */
+h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 20px 0 32px 0;
+  letter-spacing: -0.025em;
+  background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 10px rgba(99, 102, 241, 0.1);
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+/* ==========================================================================
+   Interactive Elements & Forms
+   ========================================================================== */
+input, select, button {
+  font-family: var(--font-family);
+  font-size: 0.95rem;
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: var(--transition);
+}
+
+/* Inputs & Dropdowns */
+input, select {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 12px 16px;
+  width: 100%;
+}
+
+input::placeholder {
+  color: var(--text-muted);
+}
+
+input:focus, select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--border-focus);
+  background: rgba(15, 15, 20, 0.8);
+}
+
+/* Select element specifics */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+/* Buttons */
+button {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 12px 20px;
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+button:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+/* Secondary Button (Section Toggles) */
+section > button {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  margin-top: 10px;
+  width: 100%;
+  box-shadow: none;
+}
+
+section > button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Action Specific Buttons */
+.delete-btn, #deleteGenreBtn {
+  background: var(--danger);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+.delete-btn:hover, #deleteGenreBtn:hover {
+  background: var(--danger-hover);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.3);
+}
+
+#editGenreBtn {
+  background: var(--warning);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+#editGenreBtn:hover {
+  background: var(--warning-hover);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
+}
+
+#logoutBtn {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  width: auto;
+  min-width: 150px;
+  box-shadow: none;
+}
+#logoutBtn:hover {
+  background: var(--danger);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.2);
+}
+
+/* ==========================================================================
+   Layout Containers & Cards (Glassmorphism)
+   ========================================================================== */
+section, #login-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  padding: 24px;
+  margin: 16px auto;
+  border-radius: var(--radius-lg);
+  max-width: 680px;
+  box-shadow: var(--glass-shadow);
+}
+
+/* Accordion Header & Layout styling */
+section h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ==========================================================================
+   Sections Detail Styling
+   ========================================================================== */
+
+/* Toggle Content Wrappers */
+#goalInput, #input, #investmentInput, #compareInputs, #entryLists, #calculatorInput {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+/* Input group layouts (Horizontal on PC / Stacked on Mobile) */
+.input-group {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.input-group label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.9rem;
+  align-self: center;
+}
+
+/* Genre Controls (Add & Manage Inline layout) */
+#genreControl {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+#genreControl select {
+  height: 100%;
+}
+
+/* ==========================================================================
+   Login Screen Customization
+   ========================================================================== */
+#login-section {
+  max-width: 420px;
+  margin-top: 10vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+}
+
+#login-section h2 {
+  text-align: center;
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#login-section input {
+  padding: 14px 16px;
+}
+
+#login-section button {
+  width: 100%;
+  padding: 14px;
+}
+
+#loginStatus {
+  font-size: 0.85rem;
+  text-align: center;
+  margin-top: 8px;
+  color: var(--warning);
+}
+
+/* ==========================================================================
+   Progress Bar
+   ========================================================================== */
 #progressBar, #differenceBar {
   width: 100%;
-  height: 12px;
-  background: #2a3558;
-  border-radius: 6px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
   overflow: hidden;
+  margin: 12px 0;
 }
 
 #progress, #differenceProgress {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #34d399, #059669);
-  transition: width 0.5s ease;
+  border-radius: 5px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #progress {
-  background: #3a86ff;
-}
-#differenceProgress {
-  background: #ff9f1c;
+  background: linear-gradient(90deg, var(--primary), var(--info));
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
 }
 
-/* 電卓＋履歴 */
+#differenceProgress {
+  background: linear-gradient(90deg, var(--warning), #f97316);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+#goalDisplay {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+/* ==========================================================================
+   Calculator Component
+   ========================================================================== */
 #calculatorInput {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
+  flex-direction: row;
   flex-wrap: wrap;
-  flex-wrap: nowrap;
+  gap: 24px;
   justify-content: center;
 }
 
-.calculator input {
-  margin-bottom: 10px;
-  padding: 5px;
-  font-size: 18px;
-  text-align: right;
+.calculator {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-#calc-history {
-  order: 1;
-  flex: 1;
-  min-width: 200px;
-  max-height: 260px;
-  overflow-y: auto;
-  border: 1px solid #444;
-  padding: 6px;
-  background: #2a2a2a;
-  font-size: 13px;
+.calculator input#display {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  text-align: right;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #10b981; /* Retro green display */
+  border-radius: var(--radius-sm);
+  pointer-events: none;
 }
 
 .push {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
+  gap: 8px;
 }
 
-.zero {
+.push button {
+  font-size: 1.1rem;
+  padding: 14px 0;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.push button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+/* Accent calculator operators */
+.push button:nth-child(4n),
+.push button:first-child,
+.push button:nth-child(2),
+.push button:nth-child(16) {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.push button:nth-child(4n):hover,
+.push button:first-child:hover,
+.push button:nth-child(2):hover,
+.push button:nth-child(16):hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.push .zero {
   grid-column: span 2;
+}
+
+/* Calc History List */
+#calc-history {
+  flex: 1;
+  min-width: 250px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  max-height: 334px;
+  overflow-y: auto;
+}
+
+#calc-history h3 {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .history-item {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 5px;
-  border-bottom: 1px solid #444;
-  padding-bottom: 4px;
-  font-size: 14px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
 }
 
-#entryLists, #compareInputs, #simulationInputs, #input, #goalInput {
-  display: none; 
+.history-item span:last-child {
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
-
-.toggle-btn {
-  background: #6c757d;
-  color: #fff;
-  margin-bottom: 10px;
-  border-radius: 6px;
-  padding: 6px 12px;
+/* ==========================================================================
+   List & Result Styles
+   ========================================================================== */
+.result-box, #differenceResult {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 8px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
 }
-.toggle-btn:hover {
-  background: #5a6268;
+
+.result-box p, #differenceResult p {
+  margin-bottom: 6px;
 }
 
-#logout-section {
-  text-align: center;
-  margin-top: 30px;
+.result-box p:last-child, #differenceResult p:last-child {
+  margin-bottom: 0;
+}
+
+/* List History Entries */
+.genre-list {
   margin-bottom: 20px;
 }
 
-#logoutBtn {
-  background: #ff4b5c;
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
+.genre-list h3 {
+  border-left: 3px solid var(--primary);
+  padding-left: 8px;
+  font-size: 0.95rem;
+  margin-top: 16px;
+  color: var(--text-secondary);
 }
 
-#logoutBtn:hover {
-  background: #c0323f;
+.genre-list ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-#login-section {
-  max-width: 400px;   /* セクション全体の幅 */
-  margin: 20px auto;  /* 中央寄せ */
+.genre-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.genre-list li .info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.genre-list li .info .memo {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.genre-list li .amount-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.genre-list li .amount {
+  font-weight: 600;
+}
+
+.genre-list li .amount.income {
+  color: var(--success);
+}
+
+.genre-list li .amount.expense {
+  color: var(--danger);
+}
+
+/* ==========================================================================
+   Summary Section
+   ========================================================================== */
+#summary-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+#summary-section h2 {
+  grid-column: span 2;
+  margin-bottom: 8px;
+}
+
+#summary-section p {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+#summary-section span {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+#summary-section p:nth-of-type(1) span { color: var(--success); }
+#summary-section p:nth-of-type(2) span { color: var(--danger); }
+#summary-section p:nth-of-type(3) span { color: var(--info); }
+#summary-section p:nth-of-type(4) span { color: var(--primary); }
+
+#logout-section {
   text-align: center;
+  margin: 32px 0 16px 0;
 }
 
-#login-section input {
-  width: 100%;        /* 横いっぱいに広げる */
-  max-width: 500px;   /* 最大幅を制御 */
-  margin: 8px 0;
-  padding: 12px;
-  border-radius: 6px;
-  border: none;
-  background: #2a2a2a;
-  color: #e0e0e0;
-  font-size: 14px;
-  display: block;     /* 1行ずつ縦並びに */
-}
-
-#login-section button {
-  width: 100%;
-  max-width: 100px;
-  padding: 12px;
-  margin-top: 12px;
-  border-radius: 6px;
-  background: #3a86ff;
-  color: #fff;
-  font-size: 15px;
-  cursor: pointer;
-  border: none;
-}
-
-#login-section button:hover {
-  background: #265abf;
-}
-
-#goalInput, #input {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-  background: #111827; /* ダーク背景 */
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-}
-
-/* === 各入力行（ラベル＋入力） === */
-#goalInput .input-group,
-#input .input-group {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  max-width: 400px;
-}
-
-/* === ラベル === */
-#goalInput label,
-#input label {
-  flex: 1;
-  color: #ddd;
-  font-weight: bold;
-  font-size: 14px;
-}
-
-/* === 入力欄 === */
-#goalInput input,
-#input input,
-#input select {
-  flex: 2;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: none;
-  background: #1f2937;
-  color: #fff;
-}
-
-/* === ボタン系 === */
-#goalInput button,
-#input button {
-  width: fit-content;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-/* =============================
-   比較・差額・積立・履歴・電卓の統一デザイン
-============================= */
-#compare-section,
-#difference-section,
-#investment-section,
-#history-section,
-#investment-section {
-  background: #1e1e1e;
-  padding: 20px;
-  margin: 15px auto;
-  border-radius: 12px;
-  max-width: 700px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-/* 入力フォームを縦並びに */
-#compareInputs,
-#differenceInputs,
-#simulationInputs,
-#historyInputs,
-#investmentInputs {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-  background: #111827;
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-}
-
-/* ラベル＋入力のペア */
-#compareInputs .input-group,
-#differenceInputs .input-group,
-#simulationInputs .input-group,
-#historyInputs .input-group,
-#investment .input-group {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  max-width: 400px;
-}
-
-/* ラベル */
-#compareInputs label,
-#differenceInputs label,
-#simulationInputs label,
-#historyInputs label,
-#investment label {
-  flex: 1;
-  color: #ddd;
-  font-weight: bold;
-  font-size: 14px;
-}
-
-/* 入力欄 */
-#compareInputs input, 
-#differenceInputs input, 
-#simulationInputs input, 
-#historyInputs input,
-#investment input,
-#investment select,
-#compareInputs select,
-#differenceInputs select,
-#simulationInputs select {
-  flex: 2;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: none;
-  background: #1f2937;
-  color: #fff;
-}
-
-/* ボタン統一 */
-#compareInputs button,
-#differenceInputs button,
-#simulationInputs button,
-#historyInputs button,
-#investment button {
-  width: fit-content;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-#compareInputs button:hover,
-#differenceInputs button:hover,
-#simulationInputs button:hover,
-#historyInputs button:hover,
-#investment button:hover {
-  background: #1e40af;
-}
-
-/* 履歴のリスト表示 */
-#historyList {
-  background: #2a2a2a;
-  border-radius: 8px;
-  padding: 10px;
-  margin-top: 10px;
-  max-height: 200px;
-  overflow-y: auto;
-  font-size: 14px;
-}
-
-/* 計算ツールの背景統一 */
-.calculator {
-  background: #111827;
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-    order: 2;
-  display: flex;
-  flex-direction: column;
-  width: 220px;
-}
-.push button {
-  background: #2563eb;
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px;
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.push button:hover {
-  background: #6b6b6b;
-}
-/* === 投資セクションの統一デザイン === */
-#investment-section {
-  background: #1e1e1e;
-  padding: 20px;
-  margin: 15px auto;
-  border-radius: 12px;
-  max-width: 700px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-#investment-section h2 {
-  color: #fff;
-  margin-bottom: 10px;
-  font-size: 1.2rem;
-}
-
-#investmentInput {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-  background: #111827;      /* 内部フォーム背景統一 */
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-}
-
-#investmentInput .input-group {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  max-width: 400px;
-}
-
-#investmentInput label {
-  flex: 1;
-  text-align: right;
-  color: #ddd;
-  font-weight: bold;
-  font-size: 14px;
-  padding-right: 8px;
-  white-space: nowrap; /* ラベル折り返し防止 */
-}
-
-#investmentInput input,
-#investmentInput select {
-  flex: 2;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: none;
-  background: #1f2937;
-  color: #fff;
-  width: 100%;
-}
-
-#investmentInput button {
-  width: fit-content;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.2s;
-  align-self: flex-end;
-  margin-top: 10px;
-}
-
-#investmentInput button:hover {
-  background: #1e40af;
-}
-
-#investmentResult {
-  background: #2a2a2a;
-  padding: 10px;
-  border-radius: 8px;
-  margin-top: 10px;
-  line-height: 1.6;
-}
-
-/* =============================
-   共通：セクション内部入力欄の統一
-============================= */
-.section-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-  background: #111827;
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-}
-
-.section-inputs .input-group {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  max-width: 400px;
-}
-
-.section-inputs label {
-  flex: 1;
-  color: #ddd;
-  font-weight: bold;
-  font-size: 14px;
-  text-align: left;
-}
-
-.section-inputs input,
-.section-inputs select {
-  flex: 2;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: none;
-  background: #1f2937;
-  color: #fff;
-}
-
-.section-inputs button {
-  width: fit-content;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.section-inputs button:hover {
-  background: #1e40af;
-}
-
-#investmentResult {
-  background: #2a2a2a;
-  padding: 10px;
-  border-radius: 8px;
-  margin-top: 10px;
-  line-height: 1.6;
-}
-
-/* --- 既存のCSSのどこか下の方に追記 --- */
-@media (max-width: 600px) {
-
-/* ラベル＋入力のペア */
-#compareInputs .input-group,
-#differenceInputs .input-group,
-#simulationInputs .input-group,
-#historyInputs .input-group,
-#investment .input-group,
-#investmentInput,
-#calculatorInput,
-.input-group  {
-  display: flex;
-  flex-direction: column;
-  text-align: center;
-  margin-bottom: 1px;
-}
-
-}
-
-/* =============================
-   トースト通知
-============================= */
+/* ==========================================================================
+   Toast Notifications
+   ========================================================================== */
 #toast-container {
   position: fixed;
   bottom: 24px;
   right: 24px;
+  left: 24px;
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -612,59 +620,110 @@ button:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 18px;
-  border-radius: 10px;
-  font-size: 14px;
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  padding: 14px 20px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  color: #ffffff;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
   pointer-events: all;
-  animation: toast-in 0.3s ease;
-  min-width: 220px;
-  max-width: 340px;
+  animation: toast-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.toast.undo  { background: #1e2937; border-left: 4px solid #38bdf8; }
-.toast.error { background: #2d1a1a; border-left: 4px solid #ff4b5c; }
-.toast.info  { background: #1a2d1a; border-left: 4px solid #34d399; }
+.toast.undo  { background: rgba(15, 23, 42, 0.9); border-left: 4px solid var(--info); }
+.toast.error { background: rgba(69, 10, 10, 0.9); border-left: 4px solid var(--danger); }
+.toast.info  { background: rgba(6, 78, 59, 0.9); border-left: 4px solid var(--success); }
 
 .toast-undo-btn {
   margin-left: auto;
-  background: #38bdf8;
+  background: var(--info);
   color: #0f172a;
   border: none;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 0.8rem;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 700;
   flex-shrink: 0;
+  box-shadow: none;
 }
 
 .toast-undo-btn:hover {
-  background: #7dd3fc;
+  background: #22d3ee;
+  transform: none;
 }
 
 .toast-close-btn {
   background: transparent;
-  color: #aaa;
+  color: var(--text-secondary);
   border: none;
-  font-size: 16px;
+  font-size: 1.1rem;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 4px;
   line-height: 1;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
 }
 
 .toast-close-btn:hover {
   color: #fff;
+  background: transparent;
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes toast-out {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(40px); }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(20px) scale(0.95); }
+}
+
+/* ==========================================================================
+   Responsive / Media Queries (PC Layouts)
+   ========================================================================== */
+@media (min-width: 640px) {
+  body {
+    padding: 40px 24px;
+  }
+
+  /* Input Groups side-by-side on larger screens */
+  .input-group {
+    grid-template-columns: 140px 1fr;
+    gap: 16px;
+  }
+
+  .input-group label {
+    text-align: right;
+  }
+
+  /* Toast notification positioned at bottom right on PC */
+  #toast-container {
+    left: auto;
+    right: 24px;
+    width: auto;
+  }
+
+  .toast {
+    width: 360px;
+  }
+}
+
+@media (min-width: 768px) {
+  /* Side-by-side or layout upgrades if needed */
+  #summary-section {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  #summary-section h2 {
+    grid-column: span 4;
+  }
 }
