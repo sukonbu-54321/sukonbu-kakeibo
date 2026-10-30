@@ -11,47 +11,57 @@ import {
 const SCHEMA_VERSION = 3;
 
 /**
+ * HTMLエスケープ（XSS対策）
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeHTML(str) {
+  if (typeof str !== "string") return String(str ?? "");
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
  * 旧データを現在のスキーマに移行する
  * バージョンが上がるたびに if 節を追加する（ロールフォワード対応）
  * @param {object} data - Firebaseまたはローカルから読み込んだデータ
  * @returns {object} - マイグレーション後のデータ
  */
 function migrateData(data) {
+  if (!data || typeof data !== "object") return { entries: [], goal: null, genres: ["投資", "副業", "ポイ活", "生活費", "シミュレーション"], schemaVersion: SCHEMA_VERSION };
   const ver = data.schemaVersion || 1;
 
   if (ver < 2) {
-    // v1 → v2: investmentCategory / investmentPlan フィールドを補完
     data.entries = (data.entries || []).map(e => ({
       investmentCategory: null,
       investmentPlan: null,
       ...e
     }));
     data.schemaVersion = 2;
-    console.log("📦 データをスキーマ v2 にマイグレーション完了");
   }
 
   if (ver < 3) {
-    // v2 → v3: tags フィールドを補完（将来のタグ機能拡張用スロット）
     data.entries = (data.entries || []).map(e => ({
       tags: [],
       ...e
     }));
     data.schemaVersion = 3;
-    console.log("📦 データをスキーマ v3 にマイグレーション完了");
   }
 
   return data;
 }
 
-// Firebase 初期化（本番: /__/firebase/init.json → フォールバック: ./firebase-config.json）
+// Firebase 初期化
 let auth, db;
 
 async function initFirebase() {
   try {
     let firebaseConfig = null;
 
-    // ローカルの静的サーバー（VS Code Live Server等でポート5000以外）かつ Firebase Hosting ではない環境の場合、
-    // 無駄な 404 ネットワークエラーログがコンソールに出るのを防ぐため init.json のフェッチをスキップ
     const isLocalStaticServer = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && window.location.port !== "5000";
 
     // 1次: Firebase Hosting 自動提供のURL
@@ -68,7 +78,6 @@ async function initFirebase() {
         const res2 = await fetch("./firebase-config.json");
         if (res2.ok) {
           const rawConfig = await res2.json();
-          // 空オブジェクト {} の場合は有効な設定なしとみなす
           if (rawConfig && Object.keys(rawConfig).length > 0) {
             firebaseConfig = rawConfig;
           }
@@ -77,7 +86,6 @@ async function initFirebase() {
     }
 
     if (!firebaseConfig) {
-      // 設定ファイルがない場合は想定内のローカル動作モードとして移行
       console.log("ℹ️ Firebase設定ファイルが無効または見つからないため、ローカルモードで起動します。");
       setupUIWithoutAuth();
       return;
@@ -86,7 +94,6 @@ async function initFirebase() {
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
 
-    // オフライン永続化を有効にした Firestore を初期化
     db = initializeFirestore(app, {
       localCache: persistentLocalCache()
     });
@@ -108,58 +115,102 @@ const signupBtn = document.getElementById("signupBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const statusEl = document.getElementById("loginStatus");
 
+/**
+ * Firebase Auth のエラーコードを日本語の安全なメッセージに変換
+ * @param {object} err
+ * @returns {string}
+ */
+function getFriendlyAuthErrorMessage(err) {
+  const code = err?.code || "";
+  switch (code) {
+    case "auth/invalid-email":
+      return "メールアドレスの形式が正しくありません。";
+    case "auth/user-disabled":
+      return "このアカウントは無効化されています。";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return "メールアドレスまたはパスワードが間違っています。";
+    case "auth/email-already-in-use":
+      return "このメールアドレスは既に登録されています。";
+    case "auth/weak-password":
+      return "パスワードは6文字以上で設定してください。";
+    case "auth/network-request-failed":
+      return "通信エラーが発生しました。ネットワーク接続を確認してください。";
+    case "auth/too-many-requests":
+      return "試行回数が多すぎます。しばらく待ってから再度お試しください。";
+    default:
+      return "認証処理中にエラーが発生しました。入力内容を確認してください。";
+  }
+}
+
 // 認証リスナーのセットアップ
 function setupAuthListeners() {
-  // ログイン処理
-  loginBtn.addEventListener("click", async () => {
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      statusEl.textContent = "ログイン成功";
-    } catch (err) {
-      statusEl.textContent = "エラー: " + err.message;
-    }
-  });
+  if (loginBtn) {
+    loginBtn.addEventListener("click", async () => {
+      const email = document.getElementById("loginEmail")?.value?.trim() || "";
+      const password = document.getElementById("loginPassword")?.value || "";
+      if (!email || !password) {
+        if (statusEl) statusEl.textContent = "メールアドレスとパスワードを入力してください。";
+        return;
+      }
+      try {
+        if (statusEl) statusEl.textContent = "ログイン中...";
+        await signInWithEmailAndPassword(auth, email, password);
+        if (statusEl) statusEl.textContent = "ログイン成功";
+      } catch (err) {
+        if (statusEl) statusEl.textContent = getFriendlyAuthErrorMessage(err);
+      }
+    });
+  }
 
-  // 新規登録
-  signupBtn.addEventListener("click", async () => {
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      statusEl.textContent = "アカウント作成成功！ログイン中";
-    } catch (err) {
-      statusEl.textContent = "エラー: " + err.message;
-    }
-  });
+  if (signupBtn) {
+    signupBtn.addEventListener("click", async () => {
+      const email = document.getElementById("loginEmail")?.value?.trim() || "";
+      const password = document.getElementById("loginPassword")?.value || "";
+      if (!email || !password) {
+        if (statusEl) statusEl.textContent = "メールアドレスとパスワードを入力してください。";
+        return;
+      }
+      if (password.length < 6) {
+        if (statusEl) statusEl.textContent = "パスワードは6文字以上で設定してください。";
+        return;
+      }
+      try {
+        if (statusEl) statusEl.textContent = "アカウント作成中...";
+        await createUserWithEmailAndPassword(auth, email, password);
+        if (statusEl) statusEl.textContent = "アカウント作成成功！ログイン中";
+      } catch (err) {
+        if (statusEl) statusEl.textContent = getFriendlyAuthErrorMessage(err);
+      }
+    });
+  }
 
-  // ログアウト
-  logoutBtn.addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      showToast("⚠️ ログアウトに失敗しました: " + err.message, "error");
-    }
-  });
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        showToast("⚠️ ログアウトに失敗しました: " + getFriendlyAuthErrorMessage(err), "error");
+      }
+    });
+  }
 
-  // 認証状態監視
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      loginSection.style.display = "none";
-      mainApp.style.display = "block";
+      if (loginSection) loginSection.style.display = "none";
+      if (mainApp) mainApp.style.display = "block";
       await loadDataFromFirebase();
     } else {
-      loginSection.style.display = "block";
-      mainApp.style.display = "none";
+      if (loginSection) loginSection.style.display = "block";
+      if (mainApp) mainApp.style.display = "none";
     }
   });
 }
 
-// Firebase なしでも UI を起動（localStorageのみモード）
 function setupUIWithoutAuth() {
-  loginSection.style.display = "none";
-  mainApp.style.display = "block";
+  if (loginSection) loginSection.style.display = "none";
+  if (mainApp) mainApp.style.display = "block";
 }
 
 // Firebase 読み書き
@@ -172,7 +223,6 @@ async function saveDataToFirebase() {
       genres,
       schemaVersion: SCHEMA_VERSION
     });
-    console.log("✅ Firebase に保存完了");
   } catch (e) {
     console.error("Firebase 保存エラー:", e);
     showToast("⚠️ クラウド保存に失敗しました。ローカルには保存済みです。", "error");
@@ -186,12 +236,11 @@ async function loadDataFromFirebase() {
     if (snap.exists()) {
       const raw = snap.data();
       const data = migrateData(raw);
-      entries = data.entries || [];
+      entries = Array.isArray(data.entries) ? data.entries : [];
       goal = data.goal || null;
-      genres = data.genres || ["投資", "副業", "ポイ活", "生活費", "シミュレーション"];
+      genres = Array.isArray(data.genres) ? data.genres : ["投資", "副業", "ポイ活", "生活費", "シミュレーション"];
       updateGenreSelects();
-      refreshUI(); // 全表示の一括更新
-      console.log("📦 Firebase からデータ復元完了");
+      refreshUI();
     }
   } catch (e) {
     console.error("Firebase 読み込みエラー:", e);
@@ -199,12 +248,12 @@ async function loadDataFromFirebase() {
   }
 }
 
-// ローカルキャッシュの読み込みとロールフォワード（マイグレーション）
+// ローカルキャッシュの読み込みとロールフォワード
 let localData = {
-  entries: JSON.parse(localStorage.getItem("entries")) || [],
-  goal: JSON.parse(localStorage.getItem("goal")) || null,
-  genres: JSON.parse(localStorage.getItem("genres")) || ["投資", "副業", "ポイ活", "生活費", "シミュレーション"],
-  schemaVersion: JSON.parse(localStorage.getItem("schemaVersion")) || 1
+  entries: JSON.parse(localStorage.getItem("entries") || "[]"),
+  goal: JSON.parse(localStorage.getItem("goal") || "null"),
+  genres: JSON.parse(localStorage.getItem("genres") || '["投資", "副業", "ポイ活", "生活費", "シミュレーション"]'),
+  schemaVersion: JSON.parse(localStorage.getItem("schemaVersion") || "1")
 };
 localData = migrateData(localData);
 
@@ -212,28 +261,21 @@ let entries = localData.entries;
 let goal = localData.goal;
 let genres = localData.genres;
 
-// 投資カテゴリ（資産割合グラフ用の固定ラベル）
 const investmentCategories = ["投資信託", "米国株", "日本株", "米国ETF", "日本ETF"];
 
-// Undo 機能（最大10段階まで戻せる）
+// Undo 機能（最大10段階）
 const MAX_UNDO = 10;
 let undoStack = [];
 
-/**
- * 現在の状態をスナップショット保存（Undo 用）
- */
 function takeSnapshot() {
   undoStack.push({
     entries: JSON.parse(JSON.stringify(entries)),
     goal: goal ? { ...goal } : null,
     genres: [...genres]
   });
-  if (undoStack.length > MAX_UNDO) undoStack.shift(); // 上限超過分を削除
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
 }
 
-/**
- * 1つ前のスナップショットに戻す
- */
 function undo() {
   if (undoStack.length === 0) {
     showToast("⚠️ これ以上戻せません", "error");
@@ -250,30 +292,20 @@ function undo() {
 }
 window.undo = undo;
 
-// ローカル保存（localStorage + Firebase）
 async function saveData() {
-  // localStorage に保険として保存
   try {
     localStorage.setItem("entries", JSON.stringify(entries));
     localStorage.setItem("goal", JSON.stringify(goal));
     localStorage.setItem("genres", JSON.stringify(genres));
-    localStorage.setItem("schemaVersion", JSON.stringify(SCHEMA_VERSION)); // スキーマバージョンも保存
+    localStorage.setItem("schemaVersion", JSON.stringify(SCHEMA_VERSION));
   } catch (e) {
-    console.error("localStorage 保存エラー（容量超過の可能性）:", e);
-    showToast("⚠️ ローカルストレージの容量が不足しています。", "error");
+    console.error("localStorage 保存エラー:", e);
+    showToast("⚠️ ローカルストレージの保存中にエラーが発生しました。", "error");
   }
-  // Firebase にも保存
   await saveDataToFirebase();
 }
 
 // トースト通知
-/**
- * トーストを画面右下に表示する
- * @param {string} message - 表示メッセージ
- * @param {"undo"|"error"|"info"} type - スタイル種別
- * @param {number} duration - 自動消去ミリ秒（0なら消えない）
- * @returns {HTMLElement} - 作成されたトースト要素
- */
 function showToast(message, type = "info", duration = 5000) {
   const container = document.getElementById("toast-container");
   if (!container) return null;
@@ -285,23 +317,23 @@ function showToast(message, type = "info", duration = 5000) {
   msgSpan.textContent = message;
   toast.appendChild(msgSpan);
 
-  // Undo ボタン
   if (type === "undo") {
     const undoBtn = document.createElement("button");
+    undoBtn.type = "button";
     undoBtn.className = "toast-undo-btn";
     undoBtn.textContent = "元に戻す";
-    undoBtn.onclick = () => {
+    undoBtn.addEventListener("click", () => {
       undo();
       removeToast(toast);
-    };
+    });
     toast.appendChild(undoBtn);
   }
 
-  // 閉じるボタン
   const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
   closeBtn.className = "toast-close-btn";
   closeBtn.textContent = "✕";
-  closeBtn.onclick = () => removeToast(toast);
+  closeBtn.addEventListener("click", () => removeToast(toast));
   toast.appendChild(closeBtn);
 
   container.appendChild(toast);
@@ -319,44 +351,55 @@ function removeToast(toast) {
 
 // ジャンル管理
 function addGenre() {
-  const newG = document.getElementById("newGenre").value.trim();
+  const inputEl = document.getElementById("newGenre");
+  const newG = inputEl ? inputEl.value.trim() : "";
+
   if (!newG) {
     showToast("⚠️ ジャンル名を入力してください", "error");
+    return;
+  }
+  if (newG.length > 50) {
+    showToast("⚠️ ジャンル名は50文字以内で入力してください", "error");
     return;
   }
   if (genres.includes(newG)) {
     showToast("⚠️ そのジャンルは既に存在します", "error");
     return;
   }
-  takeSnapshot(); // Undo 用スナップショット
+
+  takeSnapshot();
   genres.push(newG);
   updateGenreSelects();
   saveData();
   showToast(`✅ ジャンル「${newG}」を追加しました`, "undo");
-  document.getElementById("newGenre").value = "";
+  if (inputEl) inputEl.value = "";
 }
 window.addGenre = addGenre;
 
 function editGenre() {
   const select = document.getElementById("genreSelect");
-  const oldName = select.value;
+  const oldName = select ? select.value : "";
   if (!oldName) {
     showToast("⚠️ 編集するジャンルを選択してください", "error");
     return;
   }
 
   const newName = prompt("新しいジャンル名を入力してください:", oldName);
-  if (newName) {
+  if (newName !== null) {
     const trimmed = newName.trim();
     if (!trimmed) {
       showToast("⚠️ 有効なジャンル名を入力してください", "error");
+      return;
+    }
+    if (trimmed.length > 50) {
+      showToast("⚠️ ジャンル名は50文字以内で入力してください", "error");
       return;
     }
     if (genres.includes(trimmed)) {
       showToast("⚠️ そのジャンルは既に存在します", "error");
       return;
     }
-    takeSnapshot(); // Undo 用スナップショット
+    takeSnapshot();
     genres = genres.map(g => g === oldName ? trimmed : g);
     entries = entries.map(e => e.genre === oldName ? { ...e, genre: trimmed } : e);
     saveData();
@@ -369,14 +412,14 @@ window.editGenre = editGenre;
 
 function deleteGenre() {
   const select = document.getElementById("genreSelect");
-  const target = select.value;
+  const target = select ? select.value : "";
   if (!target) {
     showToast("⚠️ 削除するジャンルを選択してください", "error");
     return;
   }
 
   if (confirm(`ジャンル「${target}」を削除しますか？\n※このジャンルの収支データもすべて削除されます。`)) {
-    takeSnapshot(); // ← Undo 用スナップショット
+    takeSnapshot();
     genres = genres.filter(g => g !== target);
     entries = entries.filter(e => e.genre !== target);
     saveData();
@@ -396,6 +439,7 @@ function updateGenreSelects() {
 
   selects.forEach(sel => {
     if (!sel) return;
+    const currentVal = sel.value;
     sel.innerHTML = "";
 
     const placeholder = document.createElement("option");
@@ -409,6 +453,7 @@ function updateGenreSelects() {
       const opt = document.createElement("option");
       opt.value = g;
       opt.textContent = g;
+      if (g === currentVal) opt.selected = true;
       sel.appendChild(opt);
     });
   });
@@ -416,14 +461,28 @@ function updateGenreSelects() {
 
 // 目標設定
 function setGoal() {
-  const name = document.getElementById("goalName").value;
-  const amount = parseInt(document.getElementById("goalAmount").value);
-  const period = parseInt(document.getElementById("goalPeriod").value);
-  if (!name || !amount || !period) {
-    showToast("⚠️ 目標名・金額・期間を入力してください", "error");
+  const nameInput = document.getElementById("goalName");
+  const amountInput = document.getElementById("goalAmount");
+  const periodInput = document.getElementById("goalPeriod");
+
+  const name = nameInput ? nameInput.value.trim() : "";
+  const amount = amountInput ? parseInt(amountInput.value, 10) : NaN;
+  const period = periodInput ? parseInt(periodInput.value, 10) : NaN;
+
+  if (!name || isNaN(amount) || isNaN(period) || amount <= 0 || period <= 0) {
+    showToast("⚠️ 目標名・金額・期間を正しく入力してください", "error");
     return;
   }
-  takeSnapshot(); // Undo 用スナップショット
+  if (name.length > 100) {
+    showToast("⚠️ 目標名は100文字以内で入力してください", "error");
+    return;
+  }
+  if (amount > 100000000000) {
+    showToast("⚠️ 金額の上限を超えています", "error");
+    return;
+  }
+
+  takeSnapshot();
   goal = { name, amount, period };
   saveData();
   refreshUI();
@@ -433,19 +492,24 @@ window.setGoal = setGoal;
 
 // 収支入力
 function addEntry() {
-  const genre = document.getElementById("genre").value;
-  const type = document.getElementById("type").value;
-  const amount = parseInt(document.getElementById("amount").value);
-  const memo = document.getElementById("memo").value || "-";
+  const genreEl = document.getElementById("genre");
+  const typeEl = document.getElementById("type");
+  const amountEl = document.getElementById("amount");
+  const memoEl = document.getElementById("memo");
+
+  const genre = genreEl ? genreEl.value : "";
+  const type = typeEl ? typeEl.value : "expense";
+  const amount = amountEl ? parseInt(amountEl.value, 10) : NaN;
+  const memoRaw = memoEl ? memoEl.value.trim() : "";
+  const memo = memoRaw ? memoRaw.slice(0, 200) : "-";
   const date = new Date().toISOString();
 
-  // ジャンル・金額入力値ガード
   if (!genre) {
     showToast("⚠️ ジャンルを選択してください", "error");
     return;
   }
-  if (!amount || isNaN(amount) || amount <= 0) {
-    showToast("⚠️ 正しい金額を入力してください", "error");
+  if (isNaN(amount) || amount <= 0 || amount > 100000000000) {
+    showToast("⚠️ 1円以上 1,000億円以下の正しい金額を入力してください", "error");
     return;
   }
 
@@ -456,7 +520,7 @@ function addEntry() {
     investmentPlan = document.getElementById("investmentPlan")?.value || null;
   }
 
-  takeSnapshot(); // Undo 用スナップショット
+  takeSnapshot();
 
   const existing = entries.find(e =>
     e.genre === genre &&
@@ -475,14 +539,15 @@ function addEntry() {
   refreshUI();
   showToast("✅ 収支を追加しました", "undo");
 
-  document.getElementById("amount").value = "";
-  document.getElementById("memo").value = "";
+  if (amountEl) amountEl.value = "";
+  if (memoEl) memoEl.value = "";
 }
 window.addEntry = addEntry;
 
-// 削除（Undo 対応）
+// 削除
 function deleteEntry(index) {
-  takeSnapshot(); // ← Undo 用スナップショット
+  if (index < 0 || index >= entries.length) return;
+  takeSnapshot();
   entries.splice(index, 1);
   saveData();
   refreshUI();
@@ -490,10 +555,10 @@ function deleteEntry(index) {
 }
 window.deleteEntry = deleteEntry;
 
-// 履歴レンダリング
+// 履歴レンダリング（XSS対策: textContent による安全なDOM生成）
 function renderLists() {
   const container = document.getElementById("entryLists");
-  if (!container) return; // nullガード
+  if (!container) return;
   container.innerHTML = "";
   const grouped = {};
   entries.forEach((entry, index) => {
@@ -502,21 +567,37 @@ function renderLists() {
   });
 
   if (Object.keys(grouped).length === 0) {
-    container.innerHTML = "<p>履歴はありません。</p>";
+    const emptyP = document.createElement("p");
+    emptyP.textContent = "履歴はありません。";
+    container.appendChild(emptyP);
     return;
   }
 
   for (let genre in grouped) {
     const div = document.createElement("div");
     div.className = "genre-list";
-    div.innerHTML = `<h3>${genre}</h3>`;
-    const ul = document.createElement("ul");
 
+    const h3 = document.createElement("h3");
+    h3.textContent = genre;
+    div.appendChild(h3);
+
+    const ul = document.createElement("ul");
     grouped[genre].forEach(e => {
       const dateStr = new Date(e.date).toLocaleDateString("ja-JP");
       const li = document.createElement("li");
-      li.innerHTML = `<span>${dateStr} | ${e.type === "income" ? "収入" : "支出"}: ${e.amount.toLocaleString()}円 (${e.memo})</span>
-                      <button class="delete-btn" onclick="deleteEntry(${e.index})">削除</button>`;
+
+      const span = document.createElement("span");
+      const memoText = e.memo && e.memo !== "-" ? ` (${e.memo})` : "";
+      span.textContent = `${dateStr} | ${e.type === "income" ? "収入" : "支出"}: ${Number(e.amount).toLocaleString()}円${memoText}`;
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "delete-btn";
+      delBtn.textContent = "削除";
+      delBtn.addEventListener("click", () => deleteEntry(e.index));
+
+      li.appendChild(span);
+      li.appendChild(delBtn);
       ul.appendChild(li);
     });
 
@@ -525,12 +606,12 @@ function renderLists() {
   }
 }
 
-// 集計（当月・年年両方対応）
+// 集計
 function updateSummary() {
   const now = new Date();
   const nowYear  = now.getFullYear();
   const nowMonth = now.getMonth();
-  // 年と月の両方でフィルターする（年をまたいで同月のデータが混入するバグを修正）
+
   const monthlyEntries = entries.filter(e => {
     const d = new Date(e.date);
     return d.getFullYear() === nowYear && d.getMonth() === nowMonth;
@@ -540,20 +621,26 @@ function updateSummary() {
   const totalExpense = monthlyEntries.filter(e => e.type === "expense").reduce((sum, e) => sum + e.amount, 0);
   const balance = totalIncome - totalExpense;
 
-  document.getElementById("totalIncome").textContent  = totalIncome.toLocaleString();
-  document.getElementById("totalExpense").textContent = totalExpense.toLocaleString();
-  document.getElementById("balance").textContent      = balance.toLocaleString();
+  const incomeEl = document.getElementById("totalIncome");
+  const expenseEl = document.getElementById("totalExpense");
+  const balanceEl = document.getElementById("balance");
+  const progressEl = document.getElementById("progress");
+  const goalRateEl = document.getElementById("goalRate");
 
-  if (goal) {
+  if (incomeEl) incomeEl.textContent = totalIncome.toLocaleString();
+  if (expenseEl) expenseEl.textContent = totalExpense.toLocaleString();
+  if (balanceEl) balanceEl.textContent = balance.toLocaleString();
+
+  if (goal && goal.amount > 0) {
     const progressPercent = Math.min((balance / goal.amount) * 100, 100);
-    document.getElementById("progress").style.width    = progressPercent + "%";
-    document.getElementById("goalRate").textContent    = Math.max(0, Math.floor(progressPercent));
+    if (progressEl) progressEl.style.width = Math.max(0, progressPercent) + "%";
+    if (goalRateEl) goalRateEl.textContent = Math.max(0, Math.floor(progressPercent));
+  } else {
+    if (progressEl) progressEl.style.width = "0%";
+    if (goalRateEl) goalRateEl.textContent = "0";
   }
 }
 
-/**
- * UIの各表示コンポーネント（履歴一覧、目標設定、集計カード、ダッシュボード/各種グラフ）を一元化して同期更新する
- */
 function refreshUI() {
   renderLists();
   renderGoal();
@@ -562,20 +649,22 @@ function refreshUI() {
 }
 window.refreshUI = refreshUI;
 
-// 目標表示
 function renderGoal() {
+  const goalDisplay = document.getElementById("goalDisplay");
+  if (!goalDisplay) return;
   if (goal) {
-    document.getElementById("goalDisplay").textContent =
-      `目標: ${goal.name} (${goal.amount}円 / ${goal.period}年)`;
+    goalDisplay.textContent = `目標: ${goal.name} (${goal.amount.toLocaleString()}円 / ${goal.period}年)`;
   } else {
-    document.getElementById("goalDisplay").textContent = "目標未設定";
+    goalDisplay.textContent = "目標未設定";
   }
 }
 
 // セクション開閉
 function toggleSection(id) {
   const target = document.getElementById(id);
+  if (!target) return;
   const section = target.parentElement;
+  if (!section) return;
 
   if (section.classList.contains("open")) {
     target.style.display = "none";
@@ -589,6 +678,7 @@ window.toggleSection = toggleSection;
 
 function toggleCalculator() {
   const section = document.getElementById("calculatorInput");
+  if (!section) return;
   const isHidden = section.style.display === "none";
   section.style.display = isHidden ? "flex" : "none";
   localStorage.setItem("calculator_visible", isHidden ? "true" : "false");
@@ -597,34 +687,34 @@ window.toggleCalculator = toggleCalculator;
 
 function restoreCalculator(defaultDisplay = "flex") {
   const section = document.getElementById("calculatorInput");
+  if (!section) return;
   const saved = localStorage.getItem("calculator_visible");
   section.style.display = (saved === "true") ? defaultDisplay : "none";
 }
 
 // 比較・差額シミュレーション
 function toggleInterestFields() {
-  const genre = document.getElementById("compareGenre").value;
+  const genreEl = document.getElementById("compareGenre");
   const interestFields = document.getElementById("interestFields");
-  interestFields.style.display = (genre === "投資") ? "block" : "none";
+  if (!genreEl || !interestFields) return;
+  interestFields.style.display = (genreEl.value === "投資") ? "block" : "none";
 }
 window.toggleInterestFields = toggleInterestFields;
 
 function toggleInvestmentMode() {
-  const mode = document.getElementById("investmentMode").value;
   const yearsLabel = document.getElementById("compareYearsLabel");
-  yearsLabel.textContent = "運用期間 (年) ";
-  // モードによって表示を分けたい場合はここで分岐可能
+  if (yearsLabel) yearsLabel.textContent = "運用期間 (年) ";
 }
 window.toggleInvestmentMode = toggleInvestmentMode;
 
 function calculateCompare() {
-  const genre = document.getElementById("compareGenre").value;
-  const mode = document.getElementById("investmentMode").value;
-  const aAmount = parseFloat(document.getElementById("aAmount").value) || 0;
-  const bAmount = parseFloat(document.getElementById("bAmount").value) || 0;
-  const years = parseFloat(document.getElementById("compareYears").value) || 1;
-  const aRate = (parseFloat(document.getElementById("aRate").value) || 0) / 100;
-  const bRate = (parseFloat(document.getElementById("bRate").value) || 0) / 100;
+  const genre = document.getElementById("compareGenre")?.value || "";
+  const mode = document.getElementById("investmentMode")?.value || "once";
+  const aAmount = parseFloat(document.getElementById("aAmount")?.value) || 0;
+  const bAmount = parseFloat(document.getElementById("bAmount")?.value) || 0;
+  const years = parseFloat(document.getElementById("compareYears")?.value) || 1;
+  const aRate = (parseFloat(document.getElementById("aRate")?.value) || 0) / 100;
+  const bRate = (parseFloat(document.getElementById("bRate")?.value) || 0) / 100;
 
   let aTotal = aAmount, bTotal = bAmount;
 
@@ -637,7 +727,6 @@ function calculateCompare() {
     } else if (mode === "monthly") {
       const aMonthlyRate = aRate / 12;
       const bMonthlyRate = bRate / 12;
-      // ゼロ除算ガード
       aTotal = aMonthlyRate === 0
         ? aAmount * months
         : aAmount * ((Math.pow(1 + aMonthlyRate, months) - 1) / aMonthlyRate);
@@ -657,8 +746,14 @@ function calculateCompare() {
   }
 
   const diff = aTotal - bTotal;
-  document.getElementById("differenceResult").innerHTML = `
-    <h3>結果 (${genre} - ${mode === "once" ? "1回投資" : mode === "monthly" ? "毎月投資" : "年1回投資"})</h3>
+  const resultContainer = document.getElementById("differenceResult");
+  if (!resultContainer) return;
+
+  const safeGenre = escapeHTML(genre);
+  const modeText = mode === "once" ? "1回投資" : mode === "monthly" ? "毎月投資" : "年1回投資";
+
+  resultContainer.innerHTML = `
+    <h3>結果 (${safeGenre} - ${modeText})</h3>
     <p>期間: ${years} 年</p>
     <p>Aプラン最終額: <strong>${Math.round(aTotal).toLocaleString()}</strong> 円</p>
     <p>Bプラン最終額: <strong>${Math.round(bTotal).toLocaleString()}</strong> 円</p>
@@ -667,51 +762,19 @@ function calculateCompare() {
 }
 window.calculateCompare = calculateCompare;
 
-// 月別・年別集計
-function getEntriesByMonth(year, month) {
-  return entries.filter(e => {
-    const d = new Date(e.date);
-    return d.getFullYear() === year && d.getMonth() === month;
-  });
-}
-
-function getEntriesByYear(year) {
-  return entries.filter(e => {
-    const d = new Date(e.date);
-    return d.getFullYear() === year;
-  });
-}
-
-function showMonthlySummary(year, month) {
-  const monthly = getEntriesByMonth(year, month);
-  const income = monthly.filter(e => e.type === "income").reduce((s, e) => s + e.amount, 0);
-  const expense = monthly.filter(e => e.type === "expense").reduce((s, e) => s + e.amount, 0);
-  const balance = income - expense;
-  alert(`${year}年${month + 1}月\n収入: ${income}円\n支出: ${expense}円\n残高: ${balance}円`);
-}
-window.showMonthlySummary = showMonthlySummary;
-
-function showYearlySummary(year) {
-  const yearly = getEntriesByYear(year);
-  const income = yearly.filter(e => e.type === "income").reduce((s, e) => s + e.amount, 0);
-  const expense = yearly.filter(e => e.type === "expense").reduce((s, e) => s + e.amount, 0);
-  const balance = income - expense;
-  alert(`${year}年\n収入: ${income}円\n支出: ${expense}円\n残高: ${balance}円`);
-}
-window.showYearlySummary = showYearlySummary;
-
 // ============================================================
-// 電卓（eval を安全パーサーに置き換え）
+// 電卓（Zero-Eval: 安全な再帰下降パーサー）
 // ============================================================
 let calcValue = "0";
-let calcHistory = JSON.parse(localStorage.getItem("calcHistory")) || [];
+let calcHistory = JSON.parse(localStorage.getItem("calcHistory") || "[]");
 
 function updateDisplay() {
-  document.getElementById("display").value = calcValue;
+  const display = document.getElementById("display");
+  if (display) display.value = calcValue;
 }
 
 function press(key) {
-  if (calcValue === "0") calcValue = "";
+  if (calcValue === "0" && key !== ".") calcValue = "";
   calcValue += key;
   updateDisplay();
 }
@@ -730,23 +793,103 @@ function backspace() {
 window.backspace = backspace;
 
 /**
- * 安全な数式評価（eval を使わない独自パーサー）
- * 許可トークン: 数字, ., +, -, *, /, (, )
- * @param {string} expr - 数式文字列
- * @returns {number} - 計算結果
- * @throws {Error} - 不正な式の場合
+ * eval や new Function を一切使わない安全な数式計算パーサー
+ * @param {string} expr
+ * @returns {number}
  */
 function safeEval(expr) {
-  // 許可されていない文字が含まれていたら即エラー
-  if (/[^0-9+\-*/().\s]/.test(expr)) {
-    throw new Error("不正な文字が含まれています");
+  const cleanExpr = String(expr).replace(/\s+/g, "");
+  if (!cleanExpr) throw new Error("式が空です");
+
+  // トークナイズ
+  const tokens = [];
+  let i = 0;
+  while (i < cleanExpr.length) {
+    const ch = cleanExpr[i];
+    if ("+-*/()".includes(ch)) {
+      tokens.push({ type: "op", value: ch });
+      i++;
+    } else if (/[0-9.]/.test(ch)) {
+      let numStr = "";
+      while (i < cleanExpr.length && /[0-9.]/.test(cleanExpr[i])) {
+        numStr += cleanExpr[i];
+        i++;
+      }
+      if ((numStr.match(/\./g) || []).length > 1) {
+        throw new Error("数値形式エラー");
+      }
+      const num = parseFloat(numStr);
+      if (isNaN(num)) throw new Error("数値パースエラー");
+      tokens.push({ type: "num", value: num });
+    } else {
+      throw new Error("不正な文字が含まれています");
+    }
   }
-  // Function コンストラクタで strict モード評価（グローバルスコープから分離）
-  // eslint-disable-next-line no-new-func
-  const result = new Function('"use strict"; return (' + expr + ')')();
-  if (typeof result !== "number" || !isFinite(result)) {
-    throw new Error("計算結果が無効です");
-  }
+
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const consume = (expectedVal) => {
+    const tok = tokens[pos];
+    if (expectedVal !== undefined && (!tok || tok.value !== expectedVal)) {
+      throw new Error(`予期しないトークン: ${tok ? tok.value : "EOF"}`);
+    }
+    pos++;
+    return tok;
+  };
+
+  const parseExpression = () => {
+    let node = parseTerm();
+    while (peek() && (peek().value === "+" || peek().value === "-")) {
+      const op = consume().value;
+      const right = parseTerm();
+      node = op === "+" ? node + right : node - right;
+    }
+    return node;
+  };
+
+  const parseTerm = () => {
+    let node = parseFactor();
+    while (peek() && (peek().value === "*" || peek().value === "/")) {
+      const op = consume().value;
+      const right = parseFactor();
+      if (op === "/") {
+        if (right === 0) throw new Error("0で割ることはできません");
+        node = node / right;
+      } else {
+        node = node * right;
+      }
+    }
+    return node;
+  };
+
+  const parseFactor = () => {
+    if (peek() && (peek().value === "+" || peek().value === "-")) {
+      const sign = consume().value;
+      const val = parseFactor();
+      return sign === "-" ? -val : val;
+    }
+    return parsePrimary();
+  };
+
+  const parsePrimary = () => {
+    const tok = peek();
+    if (!tok) throw new Error("式が途中で終了しています");
+    if (tok.type === "num") {
+      consume();
+      return tok.value;
+    }
+    if (tok.value === "(") {
+      consume("(");
+      const val = parseExpression();
+      consume(")");
+      return val;
+    }
+    throw new Error(`予期しないトークン: ${tok.value}`);
+  };
+
+  const result = parseExpression();
+  if (pos < tokens.length) throw new Error("余剰トークンがあります");
+  if (typeof result !== "number" || !isFinite(result)) throw new Error("計算結果が無効です");
   return result;
 }
 
@@ -754,12 +897,13 @@ function calculate() {
   try {
     const result = safeEval(calcValue);
     calcHistory.unshift({ expr: calcValue, result });
+    if (calcHistory.length > 50) calcHistory.pop();
     saveCalcHistory();
     renderHistory();
     calcValue = result.toString();
     updateDisplay();
-  } catch {
-    showToast("⚠️ 計算エラー：不正な式です", "error");
+  } catch (err) {
+    showToast(`⚠️ 計算エラー: ${err.message || "不正な式です"}`, "error");
     calcValue = "0";
     updateDisplay();
   }
@@ -776,19 +920,28 @@ function saveCalcHistory() {
 
 function renderHistory() {
   const container = document.getElementById("history-list");
+  if (!container) return;
   container.innerHTML = "";
   calcHistory.forEach((h, i) => {
     const div = document.createElement("div");
     div.className = "history-item";
-    div.innerHTML = `
-      <span>${h.expr} = ${h.result}</span>
-      <button onclick="deleteHistory(${i})">削除</button>
-    `;
+
+    const span = document.createElement("span");
+    span.textContent = `${h.expr} = ${h.result}`;
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.textContent = "削除";
+    delBtn.addEventListener("click", () => deleteHistory(i));
+
+    div.appendChild(span);
+    div.appendChild(delBtn);
     container.appendChild(div);
   });
 }
 
 function deleteHistory(index) {
+  if (index < 0 || index >= calcHistory.length) return;
   calcHistory.splice(index, 1);
   saveCalcHistory();
   renderHistory();
@@ -796,48 +949,48 @@ function deleteHistory(index) {
 window.deleteHistory = deleteHistory;
 
 // ============================================================
-// 積立投資シミュレーション（ゼロ除算ガード対応）
+// 積立投資シミュレーション
 // ============================================================
 function switchInvestMode() {
-  const mode = document.getElementById("investMode").value;
-  const monthlyField = document.getElementById("monthlyInvestment").parentElement;
-  const yearsField = document.getElementById("years").parentElement;
+  const modeEl = document.getElementById("investMode");
+  const monthlyEl = document.getElementById("monthlyInvestment");
+  const yearsEl = document.getElementById("years");
   const targetField = document.getElementById("targetFields");
 
-  monthlyField.style.display = "flex";
-  yearsField.style.display = "flex";
+  if (!modeEl || !monthlyEl || !yearsEl || !targetField) return;
+
+  const mode = modeEl.value;
+  const monthlyField = monthlyEl.parentElement;
+  const yearsField = yearsEl.parentElement;
+
+  if (monthlyField) monthlyField.style.display = "flex";
+  if (yearsField) yearsField.style.display = "flex";
   targetField.style.display = "none";
 
   if (mode === "target") {
-    monthlyField.style.display = "none";
+    if (monthlyField) monthlyField.style.display = "none";
     targetField.style.display = "flex";
   } else if (mode === "period") {
-    yearsField.style.display = "none";
+    if (yearsField) yearsField.style.display = "none";
     targetField.style.display = "flex";
   }
 }
 window.switchInvestMode = switchInvestMode;
 
 function simulateInvestment() {
-  const mode = document.getElementById("investMode").value;
-  const initial = parseFloat(document.getElementById("initialInvestment").value) || 0;
-  const monthly = parseFloat(document.getElementById("monthlyInvestment").value) || 0;
-  const years = parseFloat(document.getElementById("years").value) || 0;
-  const target = parseFloat(document.getElementById("targetAmount").value) || 0;
-  const annualRate = (parseFloat(document.getElementById("annualRate").value) || 0) / 100;
-  const riskRate = (parseFloat(document.getElementById("riskRate").value) || 0) / 100;
+  const mode = document.getElementById("investMode")?.value || "normal";
+  const initial = parseFloat(document.getElementById("initialInvestment")?.value) || 0;
+  const monthly = parseFloat(document.getElementById("monthlyInvestment")?.value) || 0;
+  const years = parseFloat(document.getElementById("years")?.value) || 0;
+  const target = parseFloat(document.getElementById("targetAmount")?.value) || 0;
+  const annualRate = (parseFloat(document.getElementById("annualRate")?.value) || 0) / 100;
+  const riskRate = (parseFloat(document.getElementById("riskRate")?.value) || 0) / 100;
 
   const months = years * 12;
 
-  /**
-   * 将来価値計算（ゼロ除算ガード付き）
-   * @param {number} rate - 年利（小数）
-   * @returns {number}
-   */
   const calcFutureValue = (rate) => {
     const monthlyRate = rate / 12;
     if (monthlyRate === 0) {
-      // 年利0% → 単純積算
       return initial + monthly * months;
     }
     return (
@@ -870,7 +1023,6 @@ function simulateInvestment() {
     const monthlyRate = rateMid / 12;
     let requiredMonthly;
     if (monthlyRate === 0) {
-      // ゼロ除算ガード：単純積算で逆算
       requiredMonthly = months > 0 ? (target - initial) / months : 0;
     } else {
       const numerator   = target - initial * Math.pow(1 + monthlyRate, months);
@@ -913,7 +1065,8 @@ function simulateInvestment() {
     }
   }
 
-  document.getElementById("investmentResult").innerHTML = resultText;
+  const resultEl = document.getElementById("investmentResult");
+  if (resultEl) resultEl.innerHTML = resultText;
 }
 window.simulateInvestment = simulateInvestment;
 
@@ -984,9 +1137,7 @@ function renderBudgetChart(spent, remaining) {
   });
 }
 
-// ============================================================
 // Vision / FIRE 目標
-// ============================================================
 function updateVisionLogic() {
   const targetAmount = 5000000;
   const totalIncome  = entries.filter(e => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
@@ -1045,7 +1196,7 @@ function updateFireCountdown() {
 
 function updateAssetVisuals() {
   const ctx = document.getElementById("assetPieChart");
-  if (!ctx) return;
+  const listEl = document.getElementById("asset-detail-list");
 
   const assetData = {};
   investmentCategories.forEach(cat => { assetData[cat] = 0; });
@@ -1060,18 +1211,22 @@ function updateAssetVisuals() {
   const labels = Object.keys(assetData);
   const values = labels.map(k => Math.max(0, assetData[k]));
 
-  // リスト詳細表示は Chart がロードされていなくても常に実行（可用性の向上）
-  const listEl = document.getElementById("asset-detail-list");
   if (listEl) {
-    listEl.innerHTML = labels.map((l, i) =>
-      `<div class="history-item"><span>${l}</span><span>¥${values[i].toLocaleString()}</span></div>`
-    ).join("");
+    listEl.innerHTML = "";
+    labels.forEach((l, i) => {
+      const item = document.createElement("div");
+      item.className = "history-item";
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = l;
+      const valSpan = document.createElement("span");
+      valSpan.textContent = `¥${values[i].toLocaleString()}`;
+      item.appendChild(nameSpan);
+      item.appendChild(valSpan);
+      listEl.appendChild(item);
+    });
   }
 
-  if (typeof Chart === "undefined") {
-    console.warn("Chart.js が読み込まれていません。");
-    return;
-  }
+  if (!ctx || typeof Chart === "undefined") return;
 
   if (window.myAssetChart) window.myAssetChart.destroy();
   window.myAssetChart = new Chart(ctx, {
@@ -1091,13 +1246,11 @@ function updateAssetVisuals() {
   });
 }
 
-let budgetChart = null;
 function updateBudgetVisuals(spent, remainingAmount) {
   const now = new Date();
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const remainingDays = lastDay - now.getDate() + 1;
 
-  // 引数がない場合は自前で計算
   if (spent === undefined) {
     spent = entries
       .filter(e => {
@@ -1132,16 +1285,77 @@ function updateTotalAssets() {
 }
 
 // ============================================================
-// ページロード時の初期化
+// イベントリスナーの登録と初期化
 // ============================================================
-document.addEventListener("DOMContentLoaded", () => {
-  restoreCalculator("none");
-  renderHistory();
-  updateDisplay();
-  updateGenreSelects();
-  refreshUI(); // 画面全体の描画・同期更新
+function setupEventListeners() {
+  // セクション開閉ボタン
+  document.querySelectorAll("button[data-toggle]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.getAttribute("data-toggle");
+      if (targetId) toggleSection(targetId);
+    });
+  });
 
-  // 投資ジャンル選択時の追加入力欄をここで初期化（DOMロード完了後に実行）
+  // 目標設定ボタン
+  const setGoalBtn = document.getElementById("setGoalBtn");
+  if (setGoalBtn) setGoalBtn.addEventListener("click", setGoal);
+
+  // 収支追加ボタン
+  const addEntryBtn = document.getElementById("addEntryBtn");
+  if (addEntryBtn) addEntryBtn.addEventListener("click", addEntry);
+
+  // ジャンル操作ボタン
+  const addGenreBtn = document.getElementById("addGenreBtn");
+  if (addGenreBtn) addGenreBtn.addEventListener("click", addGenre);
+
+  const editGenreBtn = document.getElementById("editGenreBtn");
+  if (editGenreBtn) editGenreBtn.addEventListener("click", editGenre);
+
+  const deleteGenreBtn = document.getElementById("deleteGenreBtn");
+  if (deleteGenreBtn) deleteGenreBtn.addEventListener("click", deleteGenre);
+
+  // 計算ツール開閉
+  const toggleCalculatorBtn = document.getElementById("toggleCalculatorBtn");
+  if (toggleCalculatorBtn) toggleCalculatorBtn.addEventListener("click", toggleCalculator);
+
+  // 電卓プッシュボタン群
+  const pushContainer = document.querySelector(".calculator .push");
+  if (pushContainer) {
+    pushContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const action = btn.getAttribute("data-calc-action");
+      const key = btn.getAttribute("data-calc-key");
+      if (action === "clear") {
+        clearDisplay();
+      } else if (action === "backspace") {
+        backspace();
+      } else if (action === "calculate") {
+        calculate();
+      } else if (key !== null) {
+        press(key);
+      }
+    });
+  }
+
+  // 積立投資シミュレーション
+  const investModeEl = document.getElementById("investMode");
+  if (investModeEl) investModeEl.addEventListener("change", switchInvestMode);
+
+  const simulateInvestmentBtn = document.getElementById("simulateInvestmentBtn");
+  if (simulateInvestmentBtn) simulateInvestmentBtn.addEventListener("click", simulateInvestment);
+
+  // 比較シミュレーション
+  const compareGenreEl = document.getElementById("compareGenre");
+  if (compareGenreEl) compareGenreEl.addEventListener("change", toggleInterestFields);
+
+  const investmentModeEl = document.getElementById("investmentMode");
+  if (investmentModeEl) investmentModeEl.addEventListener("change", toggleInvestmentMode);
+
+  const calculateCompareBtn = document.getElementById("calculateCompareBtn");
+  if (calculateCompareBtn) calculateCompareBtn.addEventListener("click", calculateCompare);
+
+  // 投資ジャンル選択時のオプション表示
   const genreSelectForInvestment = document.getElementById("genre");
   if (genreSelectForInvestment) {
     const toggleInvestmentInputs = () => {
@@ -1154,7 +1368,17 @@ document.addEventListener("DOMContentLoaded", () => {
     genreSelectForInvestment.addEventListener("change", toggleInvestmentInputs);
     toggleInvestmentInputs();
   }
+}
+
+// ページロード時
+document.addEventListener("DOMContentLoaded", () => {
+  setupEventListeners();
+  restoreCalculator("none");
+  renderHistory();
+  updateDisplay();
+  updateGenreSelects();
+  refreshUI();
 });
 
-// Firebase 初期化を起動（非同期）
+// Firebase 初期化
 initFirebase();
